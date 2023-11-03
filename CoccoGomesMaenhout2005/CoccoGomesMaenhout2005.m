@@ -11,8 +11,8 @@
 % The v shock is markov, so VFI Toolkit calls it an 'z' shock
 % The e shock is iid, so VFI Toolkit calls it an 'e' shock
 % The eta shock is iid and occurs 'between' periods, so VFI Toolkit calls it an 'u' shock
-% To use 'u' shocks we need what VFI Toolkit calls 'Case3' (in Case1 we can choose aprime directly, 
-% in Case3 we choose d, and then some iid shock that occurs between periods determines aprime)
+% To use 'u' shocks we need what VFI Toolkit calls 'riskyasset' (in a standard endogenous state we can choose aprime directly, 
+% in riskyasset we choose d, and then some iid shock that occurs between periods determines aprime)
 %
 % This is not the actual model of CGM2005 as there is a minor difference since they use a permanent (unit
 % root) shock, whereas I use a markov (a discretized AR(1) process).
@@ -40,6 +40,9 @@ n_z=21; % Persistent shocks: AR(1)
 n_e=3; % Transitory shocks: i.i.d.
 % Grid sizes for the stochastic component of the excess returns to the risky asset
 n_u=5; % i.i.d
+
+vfoptions.riskyasset=1; % riskyasset aprime(d,u)
+simoptions.riskyasset=1;
 
 vfoptions.exoticpreferences='EpsteinZin'; % Use Epstein-Zin preferences
 vfoptions.EZutils=0; % EZ in consumption-units
@@ -261,17 +264,32 @@ DiscountFactorParamNames={'beta','sj'};
 ReturnFn=@(riskyshare,savings,a,z,e,kappa_ij)...
     CoccoGomesMaenhout2005_ReturnFn(riskyshare,savings,a,z,e,kappa_ij);
 
-%% Define aprime function used for Case 3 (value of next period assets, determined by this period decision, and u shock)
+%% Define aprime function used for riskyasset (value of next period assets, determined by this period decision, and u shock)
 
-% Case3: aprime_val=aprimeFn(d,u)
+% riskyasset: aprime_val=aprimeFn(d,u)
 aprimeFn=@(riskyshare,savings,u, Rf) CoccoGomesMaenhout2005_aprimeFn(riskyshare,savings, u, Rf); % Will return the value of aprime
 % Note that u is risky asset return and effectively includes both the (excess) mean and standard deviation of risky assets
+
+% Put the risky asset into vfoptions and simoptions
+vfoptions.aprimeFn=aprimeFn;
+vfoptions.n_u=n_u;
+vfoptions.u_grid=u_grid;
+vfoptions.pi_u=pi_u;
+simoptions.aprimeFn=aprimeFn;
+simoptions.n_u=n_u;
+simoptions.u_grid=u_grid;
+simoptions.pi_u=pi_u;
+% Because a_grid and d_grid are involved in risky assets, but are not
+% normally needed for agent distriubiton simulation, we have to also
+% include these in simoptions
+simoptions.a_grid=a_grid;
+simoptions.d_grid=d_grid;
 
 %% Solve for the value function and policy fn
 % vfoptions.lowmemory=1;
 vfoptions.verbose=1;
 tic;
-[V, Policy]=ValueFnIter_Case3_FHorz_PType(n_d,n_a,n_z,n_u,N_j,Names_i, d_grid, a_grid, z_grid, u_grid, pi_z, pi_u, ReturnFn, aprimeFn, Params, DiscountFactorParamNames,vfoptions);
+[V, Policy]=ValueFnIter_Case1_FHorz_PType(n_d,n_a,n_z,N_j,Names_i, d_grid, a_grid, z_grid, pi_z, ReturnFn, Params, DiscountFactorParamNames,vfoptions);
 toc
 
 %% Take a look at the policy
@@ -333,11 +351,7 @@ Params.AgeWeights.HighSchool=ones(N_j.HighSchool,1)/N_j.HighSchool;
 Params.AgeWeights.NoHighSchool=ones(N_j.NoHighSchool,1)/N_j.NoHighSchool;
 AgeWeightsParamNames={'AgeWeights'};
 
-simoptions.iterate=1;
-simoptions.parallel=2;
-simoptions.verbose=1;
-StationaryDist=StationaryDist_Case3_FHorz_PType(jequaloneDist,AgeWeightsParamNames,PTypeDistParamNames,Policy,n_d,n_a,n_z,n_u,N_j,Names_i,d_grid,a_grid,u_grid,pi_z,pi_u,aprimeFn, Params,simoptions);
-% simoptions.parallel=2;
+StationaryDist=StationaryDist_Case1_FHorz_PType(jequaloneDist,AgeWeightsParamNames,PTypeDistParamNames,Policy,n_d,n_a,n_z,N_j,Names_i,pi_z, Params,simoptions);
 
 % Take a look at distribution of agents over assets (check that they are not at top of grid)
 fig1=figure(1);
@@ -384,11 +398,11 @@ FnsToEvaluate.SavingsRate = @(d1,d2,a,v,e, kappa_ij) (d2-a)/exp(kappa_ij+v+e);
 FnsToEvaluate.Consumption = @(d1,d2,a,v,e, kappa_ij) CoccoGomesMaenhout2005_Consumption(d1,d2,a,v,e, kappa_ij);
 FnsToEvaluate.CashOnHand = @(d1,d2,a,v,e, kappa_ij) a+exp(kappa_ij+v+e); % Essentially, assets plus earnings [This is only correct for working age]
 
-AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case3_PType(StationaryDist, Policy, FnsToEvaluate, Params, n_d, n_a, n_z,N_j, Names_i, d_grid, a_grid, z_grid, simoptions);
+AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case1_PType(StationaryDist, Policy, FnsToEvaluate, Params, n_d, n_a, n_z,N_j, Names_i, d_grid, a_grid, z_grid, simoptions);
 
 simoptions.lifecyclepercentiles=0; % Just mean and median, no percentiles.
 simoptions.agejshifter=Params.agejshifter; % Note, this is 21,19,19, but internally will become 2,0,0
-LifeCycleProfiles=LifeCycleProfiles_FHorz_Case3_PType(StationaryDist,Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid,a_grid,z_grid, simoptions);
+LifeCycleProfiles=LifeCycleProfiles_FHorz_Case1_PType(StationaryDist,Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid,a_grid,z_grid, simoptions);
 
 % Plot life-cycle profile for mean of Risky Assets as a share of Total Assets
 % plot(LifeCycleProfiles.ShareRisky.Mean)
@@ -401,8 +415,7 @@ LifeCycleProfiles=LifeCycleProfiles_FHorz_Case3_PType(StationaryDist,Policy, Fns
 % than reproduce these I just plot them as in terms of assets.
 
 % For consumption I need to do
-ValuesOnGrid=EvalFnOnAgentDist_ValuesOnGrid_FHorz_Case3_PType(StationaryDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid, a_grid, z_grid, simoptions);
-% Because Case3 policy is same as for Case2 there is no difference in
+ValuesOnGrid=EvalFnOnAgentDist_ValuesOnGrid_FHorz_Case1_PType(StationaryDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid, a_grid, z_grid, simoptions);
 
 % Note, CGM2005 just plot the 'HighSchool' type
 % I plot for the median value of each schock
