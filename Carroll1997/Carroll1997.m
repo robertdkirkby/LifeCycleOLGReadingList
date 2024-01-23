@@ -15,8 +15,8 @@
 
 %% Basic setup
 
-n_a=401; % Assets
-n_z=51; % Permanent shock (P in C1997 notation)
+n_a=601; % Assets
+n_z=71; % Permanent shock (P in C1997 notation)
 n_e=12; % zero-income shock (V in C1997 notation) [working paper, Appendix I, makes it clear there were 11 points for Z, so one more for the zero gives us 12]
 
 N_j=50; % Carroll (1997) makes no mention I can find of how many periods? 
@@ -131,12 +131,8 @@ vfoptions.pi_e=pi_V;
 simoptions.n_e=vfoptions.n_e;
 simoptions.e_grid=vfoptions.e_grid;
 simoptions.pi_e=vfoptions.pi_e;
-vfoptions.z_grid_J=P_grid_J;
-simoptions.z_grid_J=vfoptions.z_grid_J;
-z_grid=P_grid_J(:,1); % just a placeholder
-vfoptions.pi_z_J=pi_P_J;
-simoptions.pi_z_J=vfoptions.pi_z_J;
-pi_z=pi_P_J(:,:,1); % just a placeholder
+z_grid_J=P_grid_J;
+pi_z_J=pi_P_J;
 
 %%
 DiscountFactorParamNames={'beta'};
@@ -146,7 +142,7 @@ ReturnFn=@(aprime,a,P,V,r,gamma,agej,Jr,pension) ...
 
 %% Solve value function
 tic;
-[V, Policy]=ValueFnIter_Case1_FHorz(0,n_a,n_z,N_j, [], a_grid, z_grid, pi_z, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions);
+[V, Policy]=ValueFnIter_Case1_FHorz(0,n_a,n_z,N_j, [], a_grid, z_grid_J, pi_z_J, ReturnFn, Params, DiscountFactorParamNames, [], vfoptions);
 vftime=toc
 
 %% Paper talks a lot about consumption and savings, plot a bunch of the policies for this a different ages
@@ -155,7 +151,7 @@ FnsToEvaluate.income=@(aprime,a,P,V,agej,Jr,pension) (agej<Jr)*(V*P)+(agej>=Jr)*
 FnsToEvaluate.assets=@(aprime,a,P,V) a;
 FnsToEvaluate.aprime=@(aprime,a,P,V) aprime;
 
-ValuesOnGrid=EvalFnOnAgentDist_ValuesOnGrid_FHorz_Case1(Policy, FnsToEvaluate, Params, [], 0, n_a, n_z, N_j, [], a_grid, z_grid, [],simoptions);
+ValuesOnGrid=EvalFnOnAgentDist_ValuesOnGrid_FHorz_Case1(Policy, FnsToEvaluate, Params, [], 0, n_a, n_z, N_j, [], a_grid, z_grid_J, simoptions);
 
 % plot consumption for: median value of V, three values of P (on three graphs), as function of assets for a few different ages
 fig1=figure(1);
@@ -194,15 +190,14 @@ AgeWeightParamNames={'ageweight'};
 Params.ageweight=ones(1,N_j)/N_j;
 
 %% Simulate agent distribution
-simoptions.parallel=5; % this is slower than the default (=2), but reduces the memory use
 simoptions.verbose=1;
 tic;
-StationaryDist=StationaryDist_FHorz_Case1(jequaloneDist,AgeWeightParamNames,Policy,0,n_a,n_z,N_j,pi_z,Params,simoptions);
+StationaryDist=StationaryDist_FHorz_Case1(jequaloneDist,AgeWeightParamNames,Policy,0,n_a,n_z,N_j,pi_z_J,Params,simoptions);
 agentdisttime=toc
 
 %% Let's recreate a few graphs from Carroll (1997)
 % Compute life-cycle profiles
-AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate,[],Params,0,n_a,n_z,N_j,[],a_grid,z_grid,simoptions);
+AgeConditionalStats=LifeCycleProfiles_FHorz_Case1(StationaryDist,Policy,FnsToEvaluate,Params,[],0,n_a,n_z,N_j,[],a_grid,z_grid_J,simoptions);
 
 fig3=figure(3);
 plot(24+Params.agej,AgeConditionalStats.consumption.Mean, 24+Params.agej,AgeConditionalStats.income.Mean, 24+Params.agej,AgeConditionalStats.assets.Mean)
