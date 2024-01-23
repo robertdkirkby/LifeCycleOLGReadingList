@@ -39,7 +39,7 @@ MPCwealth=DeltaC./DeltaW;
 % Note the currently it is a different MPC at every point on the grid
 size(MPCwealth)
 % We can plot this conditional on age, at the median income (shocks)
-figure(1)
+figure(4)
 subplot(3,1,1); plot(a_grid(1:end-4),MPCwealth(:,ceil(n_z/2),7,1))
 hold on
 subplot(3,1,1); plot(a_grid(1:end-4),MPCwealth(:,ceil(n_z/2),7,11))
@@ -52,19 +52,19 @@ legend('j=1','j=11','j=21')
 % Alternatively, we might want some average MPC, so we can take MPC over agent distribution (keeping just the age dimension)
 AvgMPCwealth_age=MPCwealth.*StationaryDist(1:end-4,:,:,:); % just hoping top four grid point of assets is anyway zero mass (you should check this)
 AvgMPCwealth_age=squeeze(sum(sum(sum(AvgMPCwealth_age,1),2),3));
-figure(2)
+figure(5)
 subplot(3,1,1); plot(1:1:N_j,AvgMPCwealth_age)
 title('Average MPC out of wealth')
 
 %% Next, MPC out of permanent income, but only at median permanent income shock
 DeltaC=ValuesOnGrid.consumption(:,ceil(n_z/2)+1,:,:)-ValuesOnGrid.consumption(:,ceil(n_z/2),:,:);
-DeltaPermanentIncome=reshape(P_grid_J(ceil(n_z/2)+1,:)-P_grid_J(ceil(n_z/2),:),[1,1,1,N_j]);
-MPCpermanentincome=DeltaC./DeltaPermanentIncome;
+DeltaPermanentIncome=ValuesOnGrid.income(:,ceil(n_z/2)+1,:,:)-ValuesOnGrid.income(:,ceil(n_z/2),:,:);
+MPCpermanentincome=DeltaC./DeltaPermanentIncome; % Note: Gives a nonsense answer during retirement age as no actual permanent income shocks during retirement
 
 size(MPCpermanentincome) % note the singular second dimension as just at median permanent shock
 
 % We can plot this conditional on age, at the median income (shocks)
-figure(1)
+figure(4)
 subplot(3,1,2); plot(a_grid,MPCpermanentincome(:,1,7,1))
 hold on
 subplot(3,1,2); plot(a_grid,MPCpermanentincome(:,1,7,11))
@@ -75,22 +75,26 @@ legend('j=1','j=11','j=21')
 
 
 % Alternatively, we might want some average MPC, so we can take MPC over agent distribution (keeping just the age dimension)
-AvgMPCpermanentincome_age=MPCpermanentincome.*(StationaryDist(:,ceil(n_z/2),:,:)/sum(sum(sum(sum(StationaryDist(:,ceil(n_z/2),:,:))))));
-AvgMPCpermanentincome_age=squeeze(sum(sum(sum(AvgMPCpermanentincome_age,1),2),3));
-figure(2)
-subplot(3,1,2); plot(1:1:N_j,AvgMPCpermanentincome_age)
+AvgMPCpermanentincome_age=MPCpermanentincome(:,:,2:end,:).*(StationaryDist(:,ceil(n_z/2),2:end,:)/sum(sum(sum(sum(StationaryDist(:,ceil(n_z/2),2:end,:))))));
+% The ones with transitory income V=0 are silly as there is no change in permanent income, so removed them: this is the "2:end" in the third dimension
+AvgMPCpermanentincome_age=squeeze(sum(sum(sum(AvgMPCpermanentincome_age(:,:,:,:),1,"omitnan"),2),3));
+figure(5)
+subplot(3,1,2); plot(1:1:Params.Jr,AvgMPCpermanentincome_age(1:Params.Jr))
 title('Average MPC out of permanent income)')
+xlim([1,N_j]) % use same as wealth graph so is easier to compare
 
 
 %% Lastly, MPC out of transitory income, but only at the median transitory income shock
 DeltaC=ValuesOnGrid.consumption(:,:,8,:)-ValuesOnGrid.consumption(:,:,7,:);
-DeltaTransitoryIncome=vfoptions.e_grid(8)-vfoptions.e_grid(7);
-MPCtransitoryincome=DeltaC./DeltaTransitoryIncome;
+% Note: I originally did this commented out line, but that is incorrect as income is V*P (for working age), so the change is DeltaV*P, note DeltaV which is what next line is calculating
+% DeltaTransitoryIncome=vfoptions.e_grid(8)-vfoptions.e_grid(7); 
+DeltaTransitoryIncome=ValuesOnGrid.income(:,:,8,:)-ValuesOnGrid.income(:,:,7,:);
+MPCtransitoryincome=DeltaC./DeltaTransitoryIncome; % Note: Gives NaN in retirement age, as there is no change in V during retirement so DeltaTransitoryIncome takes zero values
 
 size(MPCtransitoryincome) % note the singular second dimension as just at median permanent shock
 
 % We can plot this conditional on age, at the median income (shocks)
-figure(1)
+figure(4)
 subplot(3,1,3); plot(a_grid,MPCtransitoryincome(:,ceil(n_z/2),1,1))
 hold on
 subplot(3,1,3); plot(a_grid,MPCtransitoryincome(:,ceil(n_z/2),1,11))
@@ -103,9 +107,10 @@ legend('j=1','j=11','j=21')
 % Alternatively, we might want some average MPC, so we can take MPC over agent distribution (keeping just the age dimension)
 AvgMPCtransitoryincome_age=MPCtransitoryincome.*(StationaryDist(:,:,7,:)/sum(sum(sum(sum(StationaryDist(:,:,7,:))))));
 AvgMPCtransitoryincome_age=squeeze(sum(sum(sum(AvgMPCtransitoryincome_age,1),2),3));
-figure(2)
-subplot(3,1,3); plot(1:1:N_j,AvgMPCtransitoryincome_age)
+figure(5)
+subplot(3,1,3); plot(1:1:Params.Jr,AvgMPCtransitoryincome_age(1:Params.Jr))
 title('Average MPC out of transitory income)')
+xlim([1,N_j]) % use same as wealth graph so is easier to compare
 
 
 
@@ -118,9 +123,11 @@ title('Average MPC out of transitory income)')
 % as you are borrowing constrained and this extra income helps loosen the
 % borrowing constraint.
 
-% The MPc out of wealth/transitory income goes up in last few periods as
+% The MPC out of wealt goes up in last few periods as
 % you are smoothing the consumption of that extra income over just the few
 % remaining periods (there is no warm glow bequests in this model)
+
+
 
 
 %% Final comments
