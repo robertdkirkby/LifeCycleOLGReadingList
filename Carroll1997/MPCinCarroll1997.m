@@ -32,7 +32,7 @@ Carroll1997
 % DeltaW=a_grid(2:end)-a_grid(1:end-1);
 % Decided to use +4 grid points (as otherwise gets a bit messing because increase in wealth from moving up one grid point is so tiny it iteracts with the small errors coming from forcing choices to be on grid)
 DeltaC=ValuesOnGrid.consumption(5:end,:,:,:)-ValuesOnGrid.consumption(1:end-4,:,:,:); % I'm just going to ignore the top grid point
-DeltaW=a_grid(5:end)-a_grid(1:end-4);
+DeltaW=(1+r)*(a_grid(5:end)-a_grid(1:end-4)); % Note that when you change assets, the actual increase in wealth is (1+r)*DeltaAssets, not just DeltaAssets.
 
 
 MPCwealth=DeltaC./DeltaW;
