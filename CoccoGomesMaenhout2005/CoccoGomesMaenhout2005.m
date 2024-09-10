@@ -160,9 +160,9 @@ Params.sigma_epsilonz.NoHighSchool=sqrt(0.0105);
 % % https://en.wikipedia.org/wiki/Sum_of_normally_distributed_random_variables
 kirkbyoptions.nSigmas=2;
 kirkbyoptions.initialj1mewz=0; % WHAT DO CGM2005 USE TO START?
-[z_grid_J.College, pi_z_J.College,jequaloneDistP,otheroutputs] = discretizeLifeCycleAR1_Kirkby(zeros(1,N_j.College),Params.rho_z*ones(1,N_j.College),Params.sigma_epsilonz.College*ones(1,N_j.College),n_z,N_j.College,kirkbyoptions);
-[z_grid_J.HighSchool, pi_z_J.HighSchool,jequaloneDistP,otheroutputs] = discretizeLifeCycleAR1_Kirkby(zeros(1,N_j.HighSchool),Params.rho_z*ones(1,N_j.HighSchool),Params.sigma_epsilonz.HighSchool*ones(1,N_j.HighSchool),n_z,N_j.HighSchool,kirkbyoptions);
-[z_grid_J.NoHighSchool, pi_z_J.NoHighSchool,jequaloneDistP,otheroutputs] = discretizeLifeCycleAR1_Kirkby(zeros(1,N_j.NoHighSchool),Params.rho_z*ones(1,N_j.NoHighSchool),Params.sigma_epsilonz.NoHighSchool*ones(1,N_j.NoHighSchool),n_z,N_j.NoHighSchool,kirkbyoptions);
+[z_grid_J.College, pi_z_J.College,jequaloneDistP,otheroutputs] = discretizeLifeCycleAR1_KFTT(zeros(1,N_j.College),Params.rho_z*ones(1,N_j.College),Params.sigma_epsilonz.College*ones(1,N_j.College),n_z,N_j.College,kirkbyoptions);
+[z_grid_J.HighSchool, pi_z_J.HighSchool,jequaloneDistP,otheroutputs] = discretizeLifeCycleAR1_KFTT(zeros(1,N_j.HighSchool),Params.rho_z*ones(1,N_j.HighSchool),Params.sigma_epsilonz.HighSchool*ones(1,N_j.HighSchool),n_z,N_j.HighSchool,kirkbyoptions);
+[z_grid_J.NoHighSchool, pi_z_J.NoHighSchool,jequaloneDistP,otheroutputs] = discretizeLifeCycleAR1_KFTT(zeros(1,N_j.NoHighSchool),Params.rho_z*ones(1,N_j.NoHighSchool),Params.sigma_epsilonz.NoHighSchool*ones(1,N_j.NoHighSchool),n_z,N_j.NoHighSchool,kirkbyoptions);
 
 % Transitory income shock, e
 Params.sigma_e.College=sqrt(0.0584);
@@ -244,19 +244,13 @@ pi_u=pi_u(1,:)'; % This is iid
 % e are iid
 % u are iid and occur between time periods
 
-% Age-dependent z, so
-vfoptions.z_grid_J=z_grid_J;
-vfoptions.pi_z_J=pi_z_J;
-z_grid=z_grid_J.College(:,1); % placeholder
-pi_z=pi_z_J.College(:,:,1); % placeholder
-
 % z and u are already set up appropriately. Just need to put e into the vfoptions and simoptions.
 vfoptions.n_e=n_e;
-vfoptions.e_grid_J=e_grid_J;
-vfoptions.pi_e_J=pi_e_J;
+vfoptions.e_grid=e_grid_J;
+vfoptions.pi_e=pi_e_J;
 simoptions.n_e=vfoptions.n_e;
-simoptions.e_grid_J=vfoptions.e_grid_J;
-simoptions.pi_e_J=vfoptions.pi_e_J;
+simoptions.e_grid=vfoptions.e_grid;
+simoptions.pi_e=vfoptions.pi_e;
 
 %% Discount factor and return function
 DiscountFactorParamNames={'beta','sj'};
@@ -289,7 +283,7 @@ simoptions.d_grid=d_grid;
 % vfoptions.lowmemory=1;
 vfoptions.verbose=1;
 tic;
-[V, Policy]=ValueFnIter_Case1_FHorz_PType(n_d,n_a,n_z,N_j,Names_i, d_grid, a_grid, z_grid, pi_z, ReturnFn, Params, DiscountFactorParamNames,vfoptions);
+[V, Policy]=ValueFnIter_Case1_FHorz_PType(n_d,n_a,n_z,N_j,Names_i, d_grid, a_grid, z_grid_J, pi_z_J, ReturnFn, Params, DiscountFactorParamNames,vfoptions);
 toc
 
 %% Take a look at the policy
@@ -315,7 +309,7 @@ else
     aprimeFnParamNames={};
 end
 aprimeFnParamsVec=CreateVectorFromParams(Params, aprimeFnParamNames,N_j);
-[aprimeIndex,aprimeProbs]=CreateaprimeFnMatrix_Case3(aprimeFn, n_d, n_a, n_u, d_grid, a_grid, u_grid, aprimeFnParamsVec,0); % Note, is actually aprime_grid (but a_grid is anyway same for all ages)
+[aprimeIndex,aprimeProbs]=CreateaprimeFnMatrix_RiskyAsset(aprimeFn, n_d, n_a, n_u, d_grid, a_grid, u_grid, aprimeFnParamsVec,0); % Note, is actually aprime_grid (but a_grid is anyway same for all ages)
 % Note: aprimeIndex is [N_d,N_u], whereas aprimeProbs is [N_d,N_u]
 % plot the first, mid, and last u shock
 PolicyKron=KronPolicyIndexes_FHorz_Case2(Policy.HighSchool, n_d, n_a, n_z,N_j.HighSchool,simoptions.n_e); % Just pretend e is another z
@@ -351,7 +345,7 @@ Params.AgeWeights.HighSchool=ones(N_j.HighSchool,1)/N_j.HighSchool;
 Params.AgeWeights.NoHighSchool=ones(N_j.NoHighSchool,1)/N_j.NoHighSchool;
 AgeWeightsParamNames={'AgeWeights'};
 
-StationaryDist=StationaryDist_Case1_FHorz_PType(jequaloneDist,AgeWeightsParamNames,PTypeDistParamNames,Policy,n_d,n_a,n_z,N_j,Names_i,pi_z, Params,simoptions);
+StationaryDist=StationaryDist_Case1_FHorz_PType(jequaloneDist,AgeWeightsParamNames,PTypeDistParamNames,Policy,n_d,n_a,n_z,N_j,Names_i,pi_z_J, Params,simoptions);
 
 % Take a look at distribution of agents over assets (check that they are not at top of grid)
 fig1=figure(1);
@@ -398,14 +392,14 @@ FnsToEvaluate.SavingsRate = @(d1,d2,a,v,e, kappa_ij) (d2-a)/exp(kappa_ij+v+e);
 FnsToEvaluate.Consumption = @(d1,d2,a,v,e, kappa_ij) CoccoGomesMaenhout2005_Consumption(d1,d2,a,v,e, kappa_ij);
 FnsToEvaluate.CashOnHand = @(d1,d2,a,v,e, kappa_ij) a+exp(kappa_ij+v+e); % Essentially, assets plus earnings [This is only correct for working age]
 
-AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case1_PType(StationaryDist, Policy, FnsToEvaluate, Params, n_d, n_a, n_z,N_j, Names_i, d_grid, a_grid, z_grid, simoptions);
+AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case1_PType(StationaryDist, Policy, FnsToEvaluate, Params, n_d, n_a, n_z,N_j, Names_i, d_grid, a_grid, z_grid_J, simoptions);
 
 simoptions.lifecyclepercentiles=0; % Just mean and median, no percentiles.
 simoptions.agejshifter=Params.agejshifter; % Note, this is 21,19,19, but internally will become 2,0,0
-LifeCycleProfiles=LifeCycleProfiles_FHorz_Case1_PType(StationaryDist,Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid,a_grid,z_grid, simoptions);
+AgeConditionalStats=LifeCycleProfiles_FHorz_Case1_PType(StationaryDist,Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid,a_grid,z_grid_J, simoptions);
 
 % Plot life-cycle profile for mean of Risky Assets as a share of Total Assets
-% plot(LifeCycleProfiles.ShareRisky.Mean)
+% plot(AgeConditionalStats.ShareRisky.Mean)
 
 
 %% Figure 2 of CGM2005
@@ -415,7 +409,7 @@ LifeCycleProfiles=LifeCycleProfiles_FHorz_Case1_PType(StationaryDist,Policy, Fns
 % than reproduce these I just plot them as in terms of assets.
 
 % For consumption I need to do
-ValuesOnGrid=EvalFnOnAgentDist_ValuesOnGrid_FHorz_Case1_PType(StationaryDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid, a_grid, z_grid, simoptions);
+ValuesOnGrid=EvalFnOnAgentDist_ValuesOnGrid_FHorz_Case1_PType(StationaryDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid, a_grid, z_grid_J, simoptions);
 
 % Note, CGM2005 just plot the 'HighSchool' type
 % I plot for the median value of each schock
@@ -448,20 +442,20 @@ legend('Age 20','Age 30','Age 55','Age 75')
 %% Figure 3 of CGM2005
 % Note, these are grouped across permanent types
 fig3=figure(3);
-subplot(3,1,1); plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),LifeCycleProfiles.Consumption.Mean)
+subplot(3,1,1); plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),AgeConditionalStats.Consumption.Mean)
 hold on
-plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),LifeCycleProfiles.Income.Mean)
-plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),LifeCycleProfiles.Assets.Mean)
+plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),AgeConditionalStats.Income.Mean)
+plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),AgeConditionalStats.Assets.Mean)
 hold off
 legend('Consumption','Income','Wealth')
 xlabel('Age')
 title('Life-cycle profiles (age-conditional mean)')
 subplot(3,1,2);
 % I don't bother to do this calculation
-subplot(3,1,3); plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),LifeCycleProfiles.ShareRisky.Mean)
+subplot(3,1,3); plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),AgeConditionalStats.ShareRisky.Mean)
 hold on
-plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),LifeCycleProfiles.ShareRisky.QuantileCutoffs(2,:)) % 5th percentile
-plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),LifeCycleProfiles.ShareRisky.QuantileCutoffs(20,:)) % 95th percentile
+plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),AgeConditionalStats.ShareRisky.QuantileCutoffs(2,:)) % 5th percentile
+plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),AgeConditionalStats.ShareRisky.QuantileCutoffs(20,:)) % 95th percentile
 hold off
 legend('Mean','5th percentile','95th percentile')
 xlabel('Age')
@@ -473,10 +467,10 @@ ylim([0,1])
 %% Figure 9 of CGM2005
 % Plot of risky share for the different permanent types
 fig9=figure(9);
-plot(Params.agejshifter.NoHighSchool+(1:1:N_j.NoHighSchool),LifeCycleProfiles.ShareRisky.NoHighSchool.Mean)
+plot(Params.agejshifter.NoHighSchool+(1:1:N_j.NoHighSchool),AgeConditionalStats.ShareRisky.NoHighSchool.Mean)
 hold on
-plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),LifeCycleProfiles.ShareRisky.HighSchool.Mean)
-plot(Params.agejshifter.College+(1:1:N_j.College),LifeCycleProfiles.ShareRisky.College.Mean)
+plot(Params.agejshifter.HighSchool+(1:1:N_j.HighSchool),AgeConditionalStats.ShareRisky.HighSchool.Mean)
+plot(Params.agejshifter.College+(1:1:N_j.College),AgeConditionalStats.ShareRisky.College.Mean)
 hold on
 legend('No High School','High School','College')
 title('Life-cycle profile of Risky Share')
