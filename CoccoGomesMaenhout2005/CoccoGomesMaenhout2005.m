@@ -97,13 +97,13 @@ Params.agej.NoHighSchool=1:1:Params.J.NoHighSchool;
 % I just take the numbers for Males, and then set my actual values based on a linear interpolation of the data.
 dj_temp=interp1([0,30,60,65,70,100],[0.00587,0.00116,0.01086,0.01753,0.02785,0.39134],0:1:100,'linear');
 
-Params.sj.College=1-dj_temp((Params.agej.College+Params.agejshifter.College):100);
+Params.sj.College=1-dj_temp((Params.agej.College(1)+Params.agejshifter.College):100);
 Params.sj.College(1)=1;
 Params.sj.College(end)=0;
-Params.sj.HighSchool=1-dj_temp((Params.agej.HighSchool+Params.agejshifter.HighSchool):100);
+Params.sj.HighSchool=1-dj_temp((Params.agej.HighSchool(1)+Params.agejshifter.HighSchool):100);
 Params.sj.HighSchool(1)=1;
 Params.sj.HighSchool(end)=0;
-Params.sj.NoHighSchool=1-dj_temp((Params.agej.NoHighSchool+Params.agejshifter.NoHighSchool):100);
+Params.sj.NoHighSchool=1-dj_temp((Params.agej.NoHighSchool(1)+Params.agejshifter.NoHighSchool):100);
 Params.sj.NoHighSchool(1)=1;
 Params.sj.NoHighSchool(end)=0;
 % I use linear interpolation to fill in the numbers inbetween those reported by Bell & Miller (2005).
