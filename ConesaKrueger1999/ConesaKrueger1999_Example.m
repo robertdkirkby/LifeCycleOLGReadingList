@@ -1,11 +1,13 @@
 %% Conesa & Krueger (1999) - Social Security Reform with Heterogeneous Agents
 
-% I run this code twice, the first with the following transpathoptions.fastOLG equal to one, and then a second time with this equal to zero.
-transpathoptions.fastOLG=1
+% Setting transpathoptions.fastOLG equal to one means that the transition path will solve with 'parallelization over (age) j'
+transpathoptions.fastOLG=1;
 % fastOLG is very fast as it does a lot of parallelization, but it is very
 % demanding of hardware, so tends to only be possible for smaller grids.
-% Here it is being used so that when we solve with fastOLG=0 we already
-% have a good initial guess for the general equilibrium PricePath.
+% But we can slash the memory use by combining it with divide-and-conquer
+vfoptions.divideandconquer=1;
+vfoptions.level1n=30;
+
 
 % There are three possible policy reforms, you can choose which one to solve
 PolicyReform=1; % 1=Policy Reform A,  2=Policy Reform B,  3=Policy Reform C
@@ -15,23 +17,12 @@ PolicyReform=1; % 1=Policy Reform A,  2=Policy Reform B,  3=Policy Reform C
 % A replication of this paper that does everything can be found at: https://github.com/vfitoolkit/vfitoolkit-matlab-replication/tree/master/ConesaKrueger1999
 
 
-% The second time round I use the results of the first as an initial guess for the price paths:
-if transpathoptions.fastOLG==0
-    load ./SavedOutput/ConesaKrueger1999_fastOLG.mat PricePath % Be careful as this will be whatever PolicyReform was last time fastOLG was run
-end
-
-
 % Note: CK1999 model can actually be solved without decision variable. (You
 % can calculate analytic value for labor supply based on a and aprime, see
 % CK1999 paper. I model it explicitly so that code is easier to modify for
 % other uses.)
-if transpathoptions.fastOLG==1
-    n_d=31; % fraction of time worked
-    n_a=301; % assets
-else
-    n_d=101; % fraction of time worked
-    n_a=1001; % assets
-end
+n_d=101; % fraction of time worked
+n_a=1001; % assets
 N_j=66; % age (number of periods, to be precise this is age-19)
 
 % Note that equation (2.1) of CK1999 includes the conditional probability of survival in the expectations operator.
@@ -72,11 +63,6 @@ N_j=66; % age (number of periods, to be precise this is age-19)
 
 % A few lines I needed for running on the Server
 addpath(genpath('./MatlabToolkits/'))
-
-% Set simoptions.ncores
-simoptions.ncores=feature('numcores'); % Number of CPU cores
-
-heteroagentoptions.verbose=1;
 
 %% Set model parameters
 
@@ -259,6 +245,7 @@ GeneralEqmEqns.AccidentalBeq = @(Tr,Tr_left,n) Tr-Tr_left/(1+n); % Accidental be
 
 
 %% Solve for the initial General Equilibrium
+simoptions=struct(); % use defaults
 [p_eqm_init,~, GeneralEqmEqnsValues_init]=HeteroAgentStationaryEqm_Case1_FHorz(jequaloneDist,AgeWeightsParamNames,n_d, n_a, n_z, N_j, 0, pi_z, d_grid, a_grid, z_grid, ReturnFn, FnsToEvaluate, GeneralEqmEqns, Params, DiscountFactorParamNames, [], [], [], GEPriceParamNames, heteroagentoptions, simoptions, vfoptions);
 
 Params.r=p_eqm_init.r;
@@ -274,16 +261,16 @@ AggVars_init=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_init, Policy_i
 
 % Calculate the relevant entries for Table 5.
 AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid);
-AggVars_MeanMedianStdDev=EvalFnOnAgentDist_MeanMedianStdDev_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z, N_j, d_grid, a_grid, z_grid);
+AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z, N_j, d_grid, a_grid, z_grid);
 
 % Statistics just for working age
 simoptions.agegroupings=[1,Params.Jr]; % Working age, Retired (not actually interested in the numbers for retired)
-AllEmployedStats=LifeCycleProfiles_FHorz_Case1(StationaryDist_init,Policy_init,FnsToEvaluate,[],Params,n_d,n_a,n_z,N_j,d_grid,a_grid,z_grid,simoptions);
+AllEmployedStats=LifeCycleProfiles_FHorz_Case1(StationaryDist_init,Policy_init,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_grid,simoptions);
 
 % For Figure 1 & 2, need life cycle profile of average hours worked and assets.
 % [Actual CK1999 figure looks like it may in fact use 5 year age bins, but I do individual ages here.]
 simoptions.agegroupings=1:1:Params.J; % This is actually the default, but need to overwrite what it was set to above for working age stats
-LifeCycleProfiles_init=LifeCycleProfiles_FHorz_Case1(StationaryDist_init,Policy_init,FnsToEvaluate,[],Params,n_d,n_a,n_z,N_j,d_grid,a_grid,z_grid,simoptions);
+LifeCycleProfiles_init=LifeCycleProfiles_FHorz_Case1(StationaryDist_init,Policy_init,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_grid,simoptions);
 % Note: initial eqm is labelled 'Pay as you go' in Figure 1.
 
 
@@ -321,11 +308,11 @@ StationaryDist_final=StationaryDist_FHorz_Case1(jequaloneDist,AgeWeightsParamNam
 AggVars_final=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_final, Policy_final, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid);
 
 AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_final, Policy_final, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid);
-AggVars_MeanMedianStdDev=EvalFnOnAgentDist_MeanMedianStdDev_FHorz_Case1(StationaryDist_final, Policy_final, FnsToEvaluate, Params, [], n_d, n_a, n_z, N_j, d_grid, a_grid, z_grid);
+AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z, N_j, d_grid, a_grid, z_grid);
 
 % Statistics just for working age
 simoptions.agegroupings=[1,Params.Jr]; % Working age, Retired (not actually interested in the numbers for retired)
-AllEmployedStats=LifeCycleProfiles_FHorz_Case1(StationaryDist_final,Policy_final,FnsToEvaluate,[],Params,n_d,n_a,n_z,N_j,d_grid,a_grid,z_grid,simoptions);
+AllEmployedStats=LifeCycleProfiles_FHorz_Case1(StationaryDist_final,Policy_final,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_grid,simoptions);
 
 % Welfare comparison based on just the initial and final stationary equilibria
 EV_SS_numerator=sum(V_final(1,:,1).*StationaryDist_final(1,:,1)); % 0 assets and age 1
@@ -336,9 +323,8 @@ EV_SS=(EV_SS_numerator/EV_SS_denominator)^(1/(Params.gamma*(1-Params.sigma)))-1;
 % [Actual CK1999 figure looks like it may in fact use 5 year age bins, but
 % I do individual ages here.]
 simoptions.agegroupings=1:1:Params.J; % This is actually the default, but am setting it here explicitly anyway.
-LifeCycleProfiles_final=LifeCycleProfiles_FHorz_Case1(StationaryDist_final,Policy_final,FnsToEvaluate,[],Params,n_d,n_a,n_z,N_j,d_grid,a_grid,z_grid,simoptions);
+LifeCycleProfiles_final=LifeCycleProfiles_FHorz_Case1(StationaryDist_final,Policy_final,FnsToEvaluate,Params,[],n_d,n_a,n_z,N_j,d_grid,a_grid,z_grid,simoptions);
 % Note: final eqm is labelled 'Fully funded' in Figure 1.
-
 
 %% The transition paths for the policy reforms
 
@@ -382,15 +368,10 @@ elseif PolicyReform==3 %  3=Policy Reform C
 end
 
 % We need to give an initial guess for the price path on interest rates.
-if transpathoptions.fastOLG==0
-    PricePath0=PricePath; % This is the version that was calculated with transpathoptions.fastOLG==1 (we loaded it near start)
-else
-    % We need to give an initial guess for the price path on interest rates
-    PricePath0.r=[linspace(p_eqm_init.r, p_eqm_final.r, floor(T/2))'; p_eqm_final.r*ones(T-floor(T/2),1)];
-    PricePath0.tau=p_eqm_init.tau*(2*ParamPath.b); % Because tau is so closely related to b this seems a reasonable guess (the 2* is so the init value of b of 0.5 is instead 1)
-    PricePath0.SS=p_eqm_init.SS*(2*ParamPath.b); % Because SS is so closely related to b this seems a reasonable guess (the 2* is so the init value of b of 0.5 is instead 1)PricePath0.SS=[linspace(p_init.SS, p_final.SS, floor(T/2))'; p_final.SS*ones(T-floor(T/2),1)];
-    PricePath0.Tr=[linspace(p_eqm_init.Tr, p_eqm_final.Tr, floor(T/2))'; p_eqm_final.Tr*ones(T-floor(T/2),1)];
-end
+PricePath0.r=[linspace(p_eqm_init.r, p_eqm_final.r, floor(T/2))'; p_eqm_final.r*ones(T-floor(T/2),1)];
+PricePath0.tau=p_eqm_init.tau*(2*ParamPath.b); % Because tau is so closely related to b this seems a reasonable guess (the 2* is so the init value of b of 0.5 is instead 1)
+PricePath0.SS=p_eqm_init.SS*(2*ParamPath.b); % Because SS is so closely related to b this seems a reasonable guess (the 2* is so the init value of b of 0.5 is instead 1)PricePath0.SS=[linspace(p_init.SS, p_final.SS, floor(T/2))'; p_final.SS*ones(T-floor(T/2),1)];
+PricePath0.Tr=[linspace(p_eqm_init.Tr, p_eqm_final.Tr, floor(T/2))'; p_eqm_final.Tr*ones(T-floor(T/2),1)];
 
 % The general eqm conditions for the transtion are actually identical to
 % those of the stationary general eqm, except the AccidentalBeq which now
@@ -423,33 +404,28 @@ transpathoptions.GEnewprice3.howtoupdate=... % a row is: GEcondn, price, add, fa
 
 fprintf('Now solving for the transition path for Policy %i \n', PolicyReform)
 transpathoptions.verbose=1;
-transpathoptions.historyofpricepath=1;
 tic;
-PricePath=TransitionPath_Case1_FHorz(PricePath0, ParamPath, T, V_final, StationaryDist_init, n_d, n_a, n_z, N_j, pi_z, d_grid,a_grid,z_grid, ReturnFn, FnsToEvaluate, GeneralEqmEqns_Transition, Params, DiscountFactorParamNames, AgeWeightsParamNames, transpathoptions, simoptions, vfoptions);
-toc
+PricePath=TransitionPath_Case1_FHorz(PricePath0, ParamPath, T, V_final, StationaryDist_init, jequaloneDist, n_d, n_a, n_z, N_j, d_grid,a_grid,z_grid, pi_z, ReturnFn, FnsToEvaluate, GeneralEqmEqns_Transition, Params, DiscountFactorParamNames, AgeWeightsParamNames, transpathoptions, simoptions, vfoptions);
+toc 
 
 %% Now calculate some things about the transition path (The path for Value fn, Policy fn, and Agent Distribution)
 
 % You can calculate the value and policy functions for the transition path
 tic;
-[VPath,PolicyPath]=ValueFnOnTransPath_Case1_FHorz(PricePath, ParamPath, T, V_final, Policy_final, Params, n_d, n_a, n_z, N_j, pi_z, d_grid, a_grid,z_grid, DiscountFactorParamNames, ReturnFn, transpathoptions);
+[VPath,PolicyPath]=ValueFnOnTransPath_Case1_FHorz(PricePath, ParamPath, T, V_final, Policy_final, Params, n_d, n_a, n_z, N_j, d_grid, a_grid,z_grid, pi_z, DiscountFactorParamNames, ReturnFn, transpathoptions, vfoptions);
 toc
 
 % You can then use these to calculate the agent distribution for the transition path
 tic;
-AgentDistPath=AgentDistOnTransPath_Case1_FHorz(StationaryDist_init,PricePath, ParamPath, PolicyPath, AgeWeightsParamNames,n_d,n_a,n_z,N_j,pi_z,T, Params);
+AgentDistPath=AgentDistOnTransPath_Case1_FHorz(StationaryDist_init, jequaloneDist, PricePath, ParamPath, PolicyPath, AgeWeightsParamNames,n_d,n_a,n_z,N_j,pi_z,T, Params, transpathoptions, simoptions);
 toc
 
 % And then we can calculate AggVars for the path
 tic;
-AggVarsPath=EvalFnOnTransPath_AggVars_Case1_FHorz(FnsToEvaluate, AgentDistPath,PolicyPath, PricePath, ParamPath, Params, T, n_d, n_a, n_z, N_j, d_grid, a_grid,z_grid, transpathoptions);
+AggVarsPath=EvalFnOnTransPath_AggVars_Case1_FHorz(FnsToEvaluate, AgentDistPath,PolicyPath, PricePath, ParamPath, Params, T, n_d, n_a, n_z, N_j, d_grid, a_grid,z_grid, transpathoptions, simoptions);
 toc
 
-if transpathoptions.fastOLG==0
-    save ./SavedOutput/ConesaKrueger1999.mat -v7.3
-else
-    save ./SavedOutput/ConesaKrueger1999_fastOLG.mat PricePath -v7.3
-end
+save ./SavedOutput/ConesaKrueger1999.mat -v7.3
 
 %%
 % load ./SavedOutput/ConesaKrueger1999.mat
@@ -502,7 +478,7 @@ xlabel('Age')
 
 %% Figure: output per capita, interest rates, capital-output ratio, and labor supply over the transition path.
 
-r_Path=[p_eqm_init.r, PricePath.r,p_eqm_final.r]; % Include final so that will be visually obvious if properly converge to final equilibrium
+r_Path=[p_eqm_init.r, PricePath.r',p_eqm_final.r]; % Include final so that will be visually obvious if properly converge to final equilibrium
 
 K_Path=[AggVars_init.K.Mean, AggVarsPath.K.Mean];
 N_Path=[AggVars_init.N.Mean, AggVarsPath.N.Mean];
