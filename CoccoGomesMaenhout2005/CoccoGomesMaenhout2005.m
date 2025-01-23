@@ -32,7 +32,7 @@
 % I'm guessing that CGM2005 treat the conditional surivival probability in their EZ
 % specification as a discount factor? It does not appear to be discussed in article.
 
-n_d=[5,250]; % Fraction of assets invested in risky asset; Savings of total assets.
+n_d=[51,250]; % Fraction of assets invested in risky asset; Savings of total assets.
 n_a=250; % Number of grid points for safe asset and risky asset holdings respectively
 
 % Grid sizes for the labor income shocks
@@ -62,6 +62,19 @@ Params.J.NoHighSchool=100-Params.agejshifter.NoHighSchool; % Age ends at 100
 N_j.College=Params.J.College;
 N_j.HighSchool=Params.J.HighSchool;
 N_j.NoHighSchool=Params.J.NoHighSchool;
+
+%% To speed up the use of riskyasset we use 'refine_d', which requires us to set the decision variables in a specific order
+vfoptions.refine_d=[0,1,1]; % tell the code how many d1, d2, and d3 there are
+% Idea is to distinguish three categories of decision variable:
+%  d1: decision is in the ReturnFn but not in aprimeFn
+%  d2: decision is in the aprimeFn but not in ReturnFn
+%  d3: decision is in both ReturnFn and in aprimeFn
+% Note: ReturnFn must use inputs (d1,d3,..) 
+%       aprimeFn must use inputs (d2,d3,..)
+% n_d must be set up as n_d=[n_d1, n_d2, n_d3]
+% d_grid must be set up as d_grid=[d1_grid; d2_grid; d3_grid];
+% It is possible to solve models without any d1, as is the case here.
+
 
 %% Parameters
 
@@ -255,8 +268,8 @@ simoptions.pi_e=vfoptions.pi_e;
 %% Discount factor and return function
 DiscountFactorParamNames={'beta','sj'};
 
-ReturnFn=@(riskyshare,savings,a,z,e,kappa_ij)...
-    CoccoGomesMaenhout2005_ReturnFn(riskyshare,savings,a,z,e,kappa_ij);
+ReturnFn=@(savings,a,z,e,kappa_ij)...
+    CoccoGomesMaenhout2005_ReturnFn(savings,a,z,e,kappa_ij);
 
 %% Define aprime function used for riskyasset (value of next period assets, determined by this period decision, and u shock)
 
@@ -280,7 +293,6 @@ simoptions.a_grid=a_grid;
 simoptions.d_grid=d_grid;
 
 %% Solve for the value function and policy fn
-% vfoptions.lowmemory=1;
 vfoptions.verbose=1;
 tic;
 [V, Policy]=ValueFnIter_Case1_FHorz_PType(n_d,n_a,n_z,N_j,Names_i, d_grid, a_grid, z_grid_J, pi_z_J, ReturnFn, Params, DiscountFactorParamNames,vfoptions);
@@ -475,12 +487,6 @@ hold on
 legend('No High School','High School','College')
 title('Life-cycle profile of Risky Share')
 ylim([0,1])
-
-
-
-
-
-
 
 
 

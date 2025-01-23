@@ -1,7 +1,5 @@
-function F=CoccoGomesMaenhout2005_ReturnFn(riskyshare,savings,a,z,e,kappa_ij)
-% There are the two decision variables
-% riskyshare: is share of savings in risky asset
-% savings: is the amount of savings
+function F=CoccoGomesMaenhout2005_ReturnFn(savings,a,z,e,kappa_ij)
+% Savings is the only decision here
 
 F=-Inf;
 
