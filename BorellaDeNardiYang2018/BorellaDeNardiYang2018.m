@@ -213,6 +213,7 @@ ReturnFn=@(n_f,n_m,aprime,a,z_f,z_m,htype,r,omega,gamma,tau_ss,participationcost
 vfoptions=struct(); % use defaults
 vfoptions.verbose=1;
 vfoptions.lowmemory=1;
+vfoptions.divideandconquer=1;
 tic;
 [V,Policy]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j,d_grid,a_grid,z_grid_J,pi_z_J,ReturnFn,Params,DiscountFactorParamNames,[],vfoptions);
 toc
