@@ -167,9 +167,9 @@ d_grid=[n1_grid; n2_grid];
 % Because male and female exogenous shocks are independent, we will create them separately and then join the two
 % Set the initial distribution
 kirkbyoptions_men.initialj1sigmaz=sqrt(Params.sigmasq_init_z_men); % age j=1 is a normal distribution with mean zero and this standard deviation [you can also set the mean, but default is zero]
-[z_grid_J_men, pi_z_J_men,jequaloneDistz_men,~] = discretizeLifeCycleAR1_Kirkby(0,Params.rho_z_men,sqrt(Params.sigmasq_upsilon_men),n_z(2),N_j,kirkbyoptions_men);
+[z_grid_J_men, pi_z_J_men,jequaloneDistz_men,~] = discretizeLifeCycleAR1_KFTT(0,Params.rho_z_men,sqrt(Params.sigmasq_upsilon_men),n_z(2),N_j,kirkbyoptions_men);
 kirkbyoptions_women.initialj1sigmaz=sqrt(Params.sigmasq_init_z_women); % age j=1 is a normal distribution with mean zero and this standard deviation [you can also set the mean, but default is zero]
-[z_grid_J_women, pi_z_J_women,jequaloneDistz_women,~] = discretizeLifeCycleAR1_Kirkby(0,Params.rho_z_women,sqrt(Params.sigmasq_upsilon_women),n_z(1),N_j,kirkbyoptions_women);
+[z_grid_J_women, pi_z_J_women,jequaloneDistz_women,~] = discretizeLifeCycleAR1_KFTT(0,Params.rho_z_women,sqrt(Params.sigmasq_upsilon_women),n_z(1),N_j,kirkbyoptions_women);
 % Note, this is currently ln(z). We want the actual z
 z_grid_J_men=exp(z_grid_J_men);
 z_grid_J_women=exp(z_grid_J_women);
