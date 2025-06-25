@@ -39,6 +39,8 @@ Names_i={'femaleq1','femaleq2','femaleq3','femaleq4','femaleq5',...
 % matrices regardless of gender, so pretty sure this was resolved and model
 % is just ages 70 to 100.
 
+figure_c=0; % counter for figures
+
 %% Parameters
 % Six are just initial guesses as they will be GMM estimated later:
 % upsilon, delta, theta, k, cfloor, 
@@ -661,15 +663,135 @@ ReturnFn=@(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad
 vfoptions.verbose=1;
 vfoptions.verboseparams=1; % show params being sent to each ptype
 vfoptions.divideandconquer=1;
+% vfoptions.level1n=9; % you could reduce runtimes through playing with this a bit
+vfoptions.gridinterplayer=1;
+vfoptions.ngridinterp=10;
 tic;
 [V,Policy]=ValueFnIter_Case1_FHorz_PType(n_d,n_a,n_z,N_j,Names_i,d_grid,a_grid,z_grid,pi_z_J,ReturnFn,Params,DiscountFactorParamNames,vfoptions);
 vftime=toc
+% Note: the level of accuracy being used on assets is very high (501 points, plus 10
+% interpolation points between each two consecutive grid points). 
+% DFJ2010 appear to have used 110-to-235 points on cash-on-hand (very similar to using 
+% them on assets), although their interpolation would not be limited to
+% grid.
+
+% When using grid interpolation layer, you have to tell simoptions
+simoptions.gridinterplayer=vfoptions.gridinterplayer;
+simoptions.ngridinterp=vfoptions.ngridinterp;
 
 
+%% Quick look a value fn in final period
+figure_c=figure_c+1;
+figure(figure_c);
+subplot(2,1,1); surf(squeeze(V.maleq1(:,:,1,1,end)))
+% The warm-glow of bequests is so immense it is the only thing you can see
+subplot(2,1,2); surf(squeeze(V.maleq1(:,1:2,1,1,end)))
+% Can see that in the first two 'health' states, utility is positive, and then becomes zero when dead
+
+% NOTE: According to eqns in DFJ2010 paper, the warm-glow function phi(e) does not have a '-1' in numerator, while 
+% utility fn does. Seems odd given their choice to use same upsilon for both. This left the warm-glow as being very 
+% close to zero, so I have put the -1 in here so that there is actually a warm-glow worth keeping assets for.
+% [This should be in their code somewhere, but I have not yet tried to find it.]
+
+%% Plot the policy fn, take a look at it
+PolicyVals=PolicyInd2Val_Case1_FHorz_PType(Policy,n_d,n_a,n_z,N_j,d_grid,a_grid,simoptions);
+% The only policy is aprime
+% First, for the middle (third) quintile, look at male and female at different ages
+% row: male/female
+% column: good health (1st index), bad health (2nd index)
+figure_c=figure_c+1;
+figure(figure_c);
+subplot(2,2,1); plot(a_grid,PolicyVals.maleq3(1,:,1,8,4,1),a_grid,PolicyVals.maleq3(1,:,1,8,4,10),a_grid,PolicyVals.maleq3(1,:,1,8,4,20),a_grid,PolicyVals.maleq3(1,:,1,8,4,30))
+legend('age 70', 'age 79', 'age 89', 'age 99')
+title('Next period assets: male, good health; mid values for med shocks')
+subplot(2,2,2); plot(a_grid,PolicyVals.maleq3(1,:,2,8,4,1),a_grid,PolicyVals.maleq3(1,:,2,8,4,10),a_grid,PolicyVals.maleq3(1,:,2,8,4,20),a_grid,PolicyVals.maleq3(1,:,2,8,4,30))
+legend('age 70', 'age 79', 'age 89', 'age 99')
+title('Next period assets: male, bad health; mid values for med shocks')
+subplot(2,2,3); plot(a_grid,PolicyVals.femaleq3(1,:,1,8,4,1),a_grid,PolicyVals.femaleq3(1,:,1,8,4,10),a_grid,PolicyVals.femaleq3(1,:,1,8,4,20),a_grid,PolicyVals.femaleq3(1,:,1,8,4,30))
+legend('age 70', 'age 79', 'age 89', 'age 99')
+title('Next period assets: female, good health; mid values for med shocks')
+subplot(2,2,4); plot(a_grid,PolicyVals.femaleq3(1,:,2,8,4,1),a_grid,PolicyVals.femaleq3(1,:,2,8,4,10),a_grid,PolicyVals.femaleq3(1,:,2,8,4,20),a_grid,PolicyVals.femaleq3(1,:,2,8,4,30))
+legend('age 70', 'age 79', 'age 89', 'age 99')
+title('Next period assets: female, bad health; mid values for med shocks')
+
+% DFJ2010 don't appear to report any policy functions, so not sure if these
+% are reasonable or not.
+% The fact there is a 'cliff' at low assets looks odd, but maybe this is
+% the impact of the consumption floor? (I've not solved a consumption floor
+% model before; you have to have aprime=0 to qualify for the consumption floor 
+% transfers.) I doubt it, cliff is around $1million, and consumption floor is
+% just 2653
+
+%% Setup initial agent distribution
+% DFJ2010 say this is based on the 1996 data, but we don't have that so
+% just making something up for now.
+jequaloneDist=struct();
+
+% Based on Figures in DFJ2010, looks like different quintiles start with
+% anything from 10000 to 200,000 dollars (median for quintile). So I will
+% start them all with roughly this amount based on figure 11.
+q1initassets=2000;   [~,q1initassetsind]=min(abs(a_grid-q1initassets)); % value, and then get corresponding index in a_grid (asset grid)
+q2initassets=20000;  [~,q2initassetsind]=min(abs(a_grid-q2initassets));
+q3initassets=65000;  [~,q3initassetsind]=min(abs(a_grid-q3initassets));
+q4initassets=100000; [~,q4initassetsind]=min(abs(a_grid-q4initassets));
+q5initassets=800000; [~,q5initassetsind]=min(abs(a_grid-q5initassets));
+
+% For simplicity, start everyone healthy and min medical expenses (mid zeta, first e)
+% So put them in (q1initassets,1,8,1)
+jequaloneDist.maleq1=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.maleq1(q1initassetsind,1,8,1)=1;
+jequaloneDist.maleq2=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.maleq2(q2initassetsind,1,8,1)=1;
+jequaloneDist.maleq3=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.maleq3(q3initassetsind,1,8,1)=1;
+jequaloneDist.maleq4=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.maleq4(q4initassetsind,1,8,1)=1;
+jequaloneDist.maleq5=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.maleq5(q5initassetsind,1,8,1)=1;
+
+jequaloneDist.femaleq1=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.femaleq1(q1initassetsind,1,8,1)=1;
+jequaloneDist.femaleq2=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.femaleq2(q2initassetsind,1,8,1)=1;
+jequaloneDist.femaleq3=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.femaleq3(q3initassetsind,1,8,1)=1;
+jequaloneDist.femaleq4=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.femaleq4(q4initassetsind,1,8,1)=1;
+jequaloneDist.femaleq5=zeros([n_a,n_z,n_e],'gpuArray');
+jequaloneDist.femaleq5(q5initassetsind,1,8,1)=1;
+
+% Presumably the age weights is based on the 1996 data, I will just put
+% equal weights. Note that 'death' is happening within the model.
+AgeWeightsParamNames={'mewj'};
+Params.mewj=ones(1,N_j)/N_j;
+
+% The weight of each quintile-gender permanent type should also follow the
+% 1996 data that I don't have.
+PTypeDistParamNames={'ptypemasses'};
+Params.ptypemasses=ones(1,10)/10; % 1/5 for each quintile, and 1/2 for each gender
 
 
+%% Agent distribution
+tic;
+StationaryDist=StationaryDist_Case1_FHorz_PType(jequaloneDist,AgeWeightsParamNames,PTypeDistParamNames,Policy,n_d,n_a,n_z,N_j,Names_i,pi_z_J,Params,simoptions);
+disttime=toc
 
-%% GMM estimation
+%% Calculate the model statistics that are relevant to the GMM estimation targets
+tic;
+
+statstime=toc;
+
+%% Runtimes summary
+fprintf(' \n')
+fprintf('When doing GMM, you have solve the model a lot of times, as a rule of thumb this has to take at most a few minutes each time \n')
+fprintf('So lets look at runtimes: \n')
+fprintf('  Value fn took:    %4.1f seconds \n',vftime)
+fprintf('  Agent dist took:  %4.1f seconds \n',disttime)
+fprintf('  Model stats took: %4.1f seconds \n',statstime)
+fprintf('So total runtime was: %4.1f seconds \n', vftime+disttime+statstime)
+fprintf(' \n')
+
+%% GMM estimation (NOT YET IMPLEMENTED AS DFJ2010 MATERIALS DO NOT INCLUDE THE TARGET MOMENTS AND THEIR COVAR MATRIX)
 
 EstimParamNames={'upsilon','beta','delta','theta','k','cfloor'};
 % Reminder:

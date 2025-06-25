@@ -74,16 +74,23 @@ if h==0 || h==1 % Alive (good or bad health)
 
     if c>0
         % utility fn
-        F=(1+delta*h)*(c^(1-upsilon))/(1-upsilon);
+        F=(1+delta*h)*(c^(1-upsilon)-1)/(1-upsilon);
     end
 end
 
 
 %% Warm-glow of bequests, on death
 if h==2
-    estate=max(0,(1-tau_e)*(aprime-estateexemption));
-    warmglow=theta*((estate+k)^(1-upsilon))/(1-upsilon); % phi(e) in DNJ2010 notation
+    estate=max(0,(1-tau_e)*(a-estateexemption));
+    warmglow=theta*((estate+k)^(1-upsilon)-1)/(1-upsilon); % phi(e) in DNJ2010 notation
+    % NOTE: According to eqns in DNJ2010 paper, phi(e) does not have a '-1' in numerator, while utility fn does.
+    % Seems odd given their choice to use same upsilon for both. This left
+    % the warm-glow as being very close to zero, so I have put the -1 in
+    % here so that there is actually a warm-glow worth keeping assets for.
     F=warmglow;
+    if aprime>0
+        F=-Inf; % just to clean things up, so everyone will have a=0 when 'dead'
+    end
 end
 
 %% Dead=zero utility
