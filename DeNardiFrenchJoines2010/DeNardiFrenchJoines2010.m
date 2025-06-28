@@ -12,6 +12,16 @@
 % A few notational changes: I use j for age (DFJ2010 use t). I use q_c to
 % index the income quintiles and q1,q2,...,q5 as names for them (DFJ2010 use I).
 
+% Asset profiles look wrong.
+% When I disable cfloor, bequests, and medical expenses, the assets go to zero at end of life, as expected.
+% Turn on only bequests, asset profiles now never go down.
+% Turn on only cfloor, asset profiles go to zero at end of life, as expected.
+% Turn on both cfloor and medical expenses, asset profiles are hump shaped
+% So both (saving up for) medical expenses, and the huge warm-glow of bequests, are messing up the results.
+
+% Do I have a typo in bequests and a typo in medical expenses?
+% Hard to figure out, as DFJ2020 do not really report any model output on either of these.
+
 %% I CANNOT FIND THREE PARAMETER VALUES. JUST USING PLACEHOLDERS FOR THE MOMENT
 % tau_e and estateexemption (tautilde and xtilde in DFJ2010 notation)
 % The estate tax rate and the exemption amount for the estate tax.
@@ -48,6 +58,7 @@ figure_c=0; % counter for figures
 % Demographics
 Params.agejshifter=69;
 Params.J=N_j;
+Params.agej=1:1:N_j;
 
 % Discount factor (initial guess, will be estimated)
 Params.beta=0.97;
@@ -55,7 +66,7 @@ Params.beta=0.97;
 Params.upsilon=3.66; % CES utility param
 Params.delta=-0.36; % utility cost of bad health
 % Warm-glow of bequests (initial guesses, will be estimated)
-Params.theta=2419; % intensity of bequest motive
+% Params.theta=2419; % intensity of bequest motive
 Params.k=215; % determines curvature of warm-glow in bequests, and hence the extent to which bequests are a luxury good
 
 % Interest rate
@@ -139,25 +150,25 @@ Params.sigma_mxi=sqrt(0.665); % std dev of innovations, transitory part
 % where the "82” subscript denotes the row with age index number 82."
 
 % Following is copy-pasted from contents of healthprof.out
-healthprof.age=70:1:102;
+healthprof.age=70:1:102; % age index number
 healthprof.ageshiftFinal=[-.7599814,-.7719013,-.7743046,-.7680932,-.7541689,-.7334337,-.7067895,-.675138,-.6393813, -.6004211, -.5591595, -.5164981, -.473339, -.4305839, -.3891349, -.3498937, -.3137623, -.2816426, -.2544363, -.2330454, -.2183719, -.2113174, -.2127841, -.2236736, -.2448879, -.277329, -.3218986, -.3794986, -.451031, -.5373976, -.6395003, -.7582409, -.8945215]; 
 healthprof.healshift=[2.600759,2.55415,2.507542,2.460934,2.414325,2.367717,2.321109,2.274501,2.227893, 2.181284,2.134676, 2.088068, 2.04146, 1.994851, 1.948243, 1.901635, 1.855027, 1.808418, 1.76181,1.715202,1.668594, 1.621985, 1.575377, 1.528769, 1.482161, 1.435552, 1.388944, 1.342336, 1.295728, 1.249119, 1.202511, 1.155903, 1.109295];
 healthprof.maleshift=[.3348944,.3210961,.3072977,.2934994,.2797011,.2659027, .2521044, .2383061, .2245077, .2107094, .1969111, .1831127, .1693144, .1555161, .1417177, .1279194, .1141211, .1003227, .0865244, .0727261, .0589277, .0451294, .0313311, .0175327, .0037344, -.0100639, -.0238623, -.0376606, -.0514589, -.0652573, -.0790556,-.0928539, -.1066523];
 healthprof.PIshift=[-1.270953, -1.259267, -1.247581, -1.235895, -1.224209, -1.212523, -1.200836, -1.18915, -1.177464, -1.165778, -1.154092, -1.142406, -1.13072, -1.119033, -1.107347, -1.095661, -1.083975, -1.072289, -1.060603, -1.048917, -1.037231, -1.025545, -1.013858, -1.002172, -.9904861, -.9788, -.9671139, -.9554277, -.9437416, -.9320555, -.9203693, -.9086832, -.8969971];
 healthprof.bPI2=.3519772*ones(1,33);
+% Note: healthprof.age not use for anything [I just keep it here as it is part of healthprof.out]
 
 % So need to use these to evaluate Xb, then use this to evaluate
 % Pr(health=bad|X, two years ago); note gives Prob for 'current age'
-probbadhealth_2yr=zeros(2,102-70+1,2,5); % current h, age, gender, income q
+probbadhealth_2yr=zeros(2,102-69,2,5); % current h, age (at end of two yr period), gender, income q
 for h_c=1:2
-    for jj=70:102
+    for age=70:102
         for g_c=1:2 % female, male
             for q_c=1:5 % income quintile
-                age=jj;
-                ageindex=jj-69;
+                ageindex=age-69;
                 cpercentile=(20*(q_c-1)+10)/100; % should be 0.6 is 60th percentile; I identify each quintile with its midpoint, so bottom quintile is 10th percentile [not clear what DFJ2010 did]
-                Xb=healthprof.ageshiftFinal(ageindex)+healthprof.healshift(ageindex)*(h_c-1)+healthprof.maleshift(ageindex)*(g_c-1)+healthprof.PIshift(ageindex)*cpercentile+healthprof.bPI2(ageindex)*(cpercentile);
-                probbadhealth_2yr(h_c,ageindex,g_c,q_c)=exp(Xb)/(1+exp(Xb));
+                Xb=healthprof.ageshiftFinal(ageindex)+healthprof.healshift(ageindex)*(h_c-1)+healthprof.maleshift(ageindex)*(g_c-1)+healthprof.PIshift(ageindex)*cpercentile+healthprof.bPI2(ageindex)*(cpercentile)^2;
+                probbadhealth_2yr(h_c,ageindex,g_c,q_c)=exp(Xb)/(1+exp(Xb)); % Note: exp(x)/(1+exp(x)) is always between 0 and 1 (0 as x--->-Inf, 1 as x--->Inf)
             end
         end
     end
@@ -178,13 +189,12 @@ end
 % As double checks that solution is correct, we should have:
 %   gg=g^2+(1-g)*(1-b)
 
-probbadhealth_2yr=zeros(2,102-70+1,2,5); % current h, age, gender, income q
-probhealth=zeros(2,2,102-70+1,2,5); % previous h, current h, age, gender, income q
-for jj=70:102
+% probbadhealth_2yr=zeros(2,102-69,2,5); % current h, age, gender, income q
+probhealth=zeros(2,2,102-69,2,5); % previous h, current h, age, gender, income q
+for age=70:102
     for g_c=1:2 % female, male
         for q_c=1:5 % income quintile
-            age=jj;
-            ageindex=jj-69;
+            ageindex=age-69;
 
             hlag_c=1; % h=0 good health
             gg=1-probbadhealth_2yr(hlag_c,ageindex,g_c,q_c);
@@ -199,18 +209,19 @@ for jj=70:102
             % the pdf 'two_to_one.pdf' suggests this is not used
             g=(1-bb-b*(1-b))/(1-b);
 
+            % Do transitions from good health to good/bad health
             hlag_c=1; % h=0 good health
-            if h_c==1
-                probhealth(hlag_c,h_c,ageindex,g_c,q_c)=g; % good-to-good
-            elseif h_c==2
-                probhealth(hlag_c,h_c,ageindex,g_c,q_c)=1-g; % good-to-bad
-            end
-            hlag_c=2; % h=0 good health
-            if h_c==1
-                probhealth(hlag_c,h_c,ageindex,g_c,q_c)=1-b; % bad-to-good
-            elseif h_c==2
-                probhealth(hlag_c,h_c,ageindex,g_c,q_c)=b; % bad-to-bad
-            end
+            h_c=1; % h=0 good health
+            probhealth(hlag_c,h_c,ageindex,g_c,q_c)=g; % good-to-good
+            h_c=2; % h=1 bad health
+            probhealth(hlag_c,h_c,ageindex,g_c,q_c)=1-g; % good-to-bad
+
+            % Do transitions from bad health to good/bad health
+            hlag_c=2; % h=1 bad health
+            h_c=1; % h=0 good health
+            probhealth(hlag_c,h_c,ageindex,g_c,q_c)=1-b; % bad-to-good
+            h_c=2; % h=1 bad health
+            probhealth(hlag_c,h_c,ageindex,g_c,q_c)=b; % bad-to-bad
 
         end
     end
@@ -248,11 +259,10 @@ deathprof.bPI2=.1008181*ones(1,33);
 % Pr(alive at t|X, two years ago); note gives Prob for 'current age'
 probalive_2yr=zeros(2,102-70+1,2,5); % current h, age, gender, income q
 for h_c=1:2
-    for jj=70:102
+    for age=70:102
         for g_c=1:2 % female, male
             for q_c=1:5 % income quintile
-                age=jj;
-                ageindex=jj-69;
+                ageindex=age-69;
                 cpercentile=(20*(q_c-1)+10)/100; % should be 0.6 is 60th percentile; I identify each quintile with its midpoint, so bottom quintile is 10th percentile [not clear what DFJ2010 did]
                 Xb=deathprof.ageshiftFinal(ageindex)+deathprof.healshift(ageindex)*(h_c-1)+deathprof.maleshift(ageindex)*(g_c-1)+deathprof.PIshift(ageindex)*cpercentile+deathprof.bPI2(ageindex)*(cpercentile);
                 probalive_2yr(h_c,ageindex,g_c,q_c)=exp(Xb)/(1+exp(Xb));
@@ -268,13 +278,14 @@ probalive_1yr=sqrt(probalive_2yr); % current h, age, gender, income q
 %% Combine health probabilities and conditional survival probabilities to
 % construct the transtion matrix for pi_h_J for each ptype.
 
+
 pi_h_J.femaleq1=zeros(n_z(1),n_z(1),N_j);
 g_c=1; % female
 q_c=1; % 1st income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.femaleq1(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -292,7 +303,7 @@ q_c=2; % 2nd income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.femaleq2(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -309,7 +320,7 @@ q_c=3; % 3rd income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.femaleq3(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -326,7 +337,7 @@ q_c=4; % 4th income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.femaleq4(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -343,7 +354,7 @@ q_c=5; % 5th income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.femaleq5(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -362,7 +373,7 @@ q_c=1; % 1st income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.maleq1(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -379,7 +390,7 @@ q_c=2; % 2nd income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.maleq2(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -396,7 +407,7 @@ q_c=3; % 3rd income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.maleq3(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -413,7 +424,7 @@ q_c=4; % 4th income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.maleq4(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -430,7 +441,7 @@ q_c=5; % 5th income quintile
 for hlag_c=1:2
     for jj=1:N_j
         % conditional survival probabilities
-        sj=1-probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
+        sj=probalive_1yr(hlag_c,jj,g_c,q_c); % current h, age+1, gender, income q
         % health transitions
         pi_h_J.maleq5(hlag_c,3,jj)=(1-sj); % probability of dying
         for h_c=1:2
@@ -655,7 +666,7 @@ DiscountFactorParamNames={'beta'};
 % Note: conditional survival probabilities are handled by pi_h_J
 % Specifically the transtions from h=0 & h=1 (good and bad health) to h=2 (death).
 
-ReturnFn=@(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6) ...
+ReturnFn=@(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
     DeNardiFrenchJoines2010_ReturnFn(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
 
 
@@ -734,7 +745,7 @@ q1initassets=2000;   [~,q1initassetsind]=min(abs(a_grid-q1initassets)); % value,
 q2initassets=20000;  [~,q2initassetsind]=min(abs(a_grid-q2initassets));
 q3initassets=65000;  [~,q3initassetsind]=min(abs(a_grid-q3initassets));
 q4initassets=100000; [~,q4initassetsind]=min(abs(a_grid-q4initassets));
-q5initassets=800000; [~,q5initassetsind]=min(abs(a_grid-q5initassets));
+q5initassets=180000; [~,q5initassetsind]=min(abs(a_grid-q5initassets));
 
 % For simplicity, start everyone healthy and min medical expenses (mid zeta, first e)
 % So put them in (q1initassets,1,8,1)
@@ -777,9 +788,147 @@ StationaryDist=StationaryDist_Case1_FHorz_PType(jequaloneDist,AgeWeightsParamNam
 disttime=toc
 
 %% Calculate the model statistics that are relevant to the GMM estimation targets
-tic;
+FnsToEvaluate.assets=@(aprime,a,h,zeta,xi) a;
+simoptions.conditionalrestrictions.alive=@(aprime,a,h,zeta,xi) (h==0) || (h==1);
 
-statstime=toc;
+% Note: only actually use the median in the estimation so internally the GMM command will set simoptions.whichstats=[0,1,0,0,0,0,0]
+tic;
+AgeConditionalStats=LifeCycleProfiles_FHorz_Case1_PType(StationaryDist,Policy,FnsToEvaluate,Params,n_d,n_a,n_z,N_j,Names_i,d_grid,a_grid,z_grid,simoptions);
+statstime=toc
+
+%% Calculate the various other model stats so we can create some graphs and better understand what the model is doing
+FnsToEvaluate.assets=@(aprime,a,h,zeta,xi) a;
+FnsToEvaluate.fractionliving=@(aprime,a,h,zeta,xi) (h==0) || (h==1);
+FnsToEvaluate.goodhealth=@(aprime,a,h,zeta,xi) (h==0);
+FnsToEvaluate.earnings=@(aprime,a,h,zeta,xi,earnings) earnings;
+FnsToEvaluate.aftertaxincome=@(aprime,a,h,zeta,xi,r,earnings, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
+    DeNardiFrenchJoines2010_AfterTaxIncome(aprime,a,h,zeta,xi,r,earnings, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
+FnsToEvaluate.medicalexpenses=@(aprime,a,h,zeta,xi,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood)...
+    DeNardiFrenchJoines2010_MedicalExpenses(aprime,a,h,zeta,xi,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood);
+FnsToEvaluate.govtransfers=@(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
+    DeNardiFrenchJoines2010_GovTransfers(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
+
+simoptions.conditionalrestrictions.alive=@(aprime,a,h,zeta,xi) (h==0) || (h==1);
+simoptions.conditionalrestrictions.ingoodhealth=@(aprime,a,h,zeta,xi) (h==0);
+simoptions.conditionalrestrictions.inbadhealth=@(aprime,a,h,zeta,xi) (h==1);
+
+tic;
+AgeConditionalStats=LifeCycleProfiles_FHorz_Case1_PType(StationaryDist,Policy,FnsToEvaluate,Params,n_d,n_a,n_z,N_j,Names_i,d_grid,a_grid,z_grid,simoptions);
+statstime2=toc
+
+% Plot of assets by earnings quintile (DFJ2010 do a lot of versions of this)
+figure_c=figure_c+1;
+figure(figure_c);
+subplot(1,2,1); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.maleq1.Mean)
+hold on
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.maleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.maleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.maleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.maleq4.Mean)
+hold off
+title('Mean assets, male')
+legend('income q1','income q2','income q3','income q4','income q5')
+subplot(1,2,2); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.femaleq1.Mean)
+hold on
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.femaleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.femaleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.femaleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.assets.femaleq5.Mean)
+hold off
+title('Mean assets, female')
+legend('income q1','income q2','income q3','income q4','income q5')
+
+% See how much of the assets at end of life is just because the people with
+% bad health all died and mostly just good health left (as seen in previous figure).
+figure_c=figure_c+1;
+figure(figure_c);
+subplot(1,2,1); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.maleq1.Mean)
+hold on
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.maleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.maleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.maleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.maleq4.Mean)
+hold off
+title('Mean assets, male in good health')
+legend('income q1','income q2','income q3','income q4','income q5')
+subplot(1,2,2); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.femaleq1.Mean)
+hold on
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.femaleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.femaleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.femaleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.ingoodhealth.assets.femaleq5.Mean)
+hold off
+title('Mean assets, female in good health')
+legend('income q1','income q2','income q3','income q4','income q5')
+
+% Look at some things relating to health and death
+figure_c=figure_c+1;
+figure(figure_c);
+subplot(2,1,1); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.fractionliving.Mean)
+title('fraction of original 70 yr olds still alive')
+subplot(2,1,2); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.goodhealth.Mean)
+title('fraction in good health')
+
+% Look at earnings, after tax income, medical expenses, and gov transfers
+figure_c=figure_c+1;
+figure(figure_c);
+subplot(2,2,1); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq1.Mean)
+hold on
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq5.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.femaleq1.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.femaleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.femaleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.femaleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.femaleq5.Mean)
+hold off
+title('Earnings (Mean)')
+legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+subplot(2,2,2); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq1.Mean)
+hold on
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq5.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femaleq1.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femaleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femaleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femaleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femaleq5.Mean)
+title('After-Tax Income (Mean)')
+legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+subplot(2,2,3); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq1.Mean)
+hold on
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq5.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.femaleq1.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.femaleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.femaleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.femaleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.femaleq5.Mean)
+title('Medical expenses (Mean)')
+legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+subplot(2,2,4); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq1.Mean)
+hold on
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq5.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq1.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq5.Mean)
+title('Gov Transfers (Mean)')
+legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+
+
+
+
 
 %% Runtimes summary
 fprintf(' \n')
@@ -790,6 +939,11 @@ fprintf('  Agent dist took:  %4.1f seconds \n',disttime)
 fprintf('  Model stats took: %4.1f seconds \n',statstime)
 fprintf('So total runtime was: %4.1f seconds \n', vftime+disttime+statstime)
 fprintf(' \n')
+% Even just on laptop it is easy fast enough you can GMM estimate it.
+
+% Note: currently calculating way more model stats that are needed in the
+% estimation. If you strip it back to just those for estimation the runtime
+% for those stats falls substantially.
 
 %% GMM estimation (NOT YET IMPLEMENTED AS DFJ2010 MATERIALS DO NOT INCLUDE THE TARGET MOMENTS AND THEIR COVAR MATRIX)
 

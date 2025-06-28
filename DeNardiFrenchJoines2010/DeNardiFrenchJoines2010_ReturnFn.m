@@ -58,18 +58,17 @@ if h==0 || h==1 % Alive (good or bad health)
     % after-tax income is then just
     aftertaxincome=taxableincome-tax;
 
-    % govtransfers to meet Consumption floor
-    govtransfers=max(0,cfloor+m-aftertaxincome);
-
+    govtransfers=0;
     % Budget constraint (eqn 9 of DFJ2010)
-    if govtransfers==0
-        c=a + aftertaxincome+govtransfers-m-aprime;
-    else
-        % impose c=cfloor and aprime=0
+    c=a + aftertaxincome+govtransfers-m-aprime;
+    % c=a + aftertaxincome+govtransfers-aprime; % DISABLE MEDICAL EXPENSES
+
+    % If this puts you below the consumption floor, then you can get govtransfers to reach cfloor, but only if aprime=0
+    if c<0 && aprime==0
+        % impose c=cfloor
         c=cfloor;
-        if aprime>0
-            F=-Inf;
-        end
+        % receive govtransfers to meet Consumption floor
+        govtransfers=cfloor-(a+aftertaxincome-m); % note: this is just the budget constraint rearranged, but with c=cfloor and aprime=0
     end
 
     if c>0
@@ -81,12 +80,15 @@ end
 
 %% Warm-glow of bequests, on death
 if h==2
-    estate=max(0,(1-tau_e)*(a-estateexemption));
-    warmglow=theta*((estate+k)^(1-upsilon)-1)/(1-upsilon); % phi(e) in DNJ2010 notation
+    if a<=estateexemption
+        estate=a; % estate is untaxed
+    else
+        estate=(1-tau_e)*(a-estateexemption) + estateexemption; % Get taxed on the amount above the exemption 
+    end
+    warmglow=theta*((estate+k)^(1-upsilon))/(1-upsilon); % phi(e) in DNJ2010 notation
+    % 'k' here makes the warm-glow a 'luxury' so richer households leave bigger bequests.
     % NOTE: According to eqns in DNJ2010 paper, phi(e) does not have a '-1' in numerator, while utility fn does.
-    % Seems odd given their choice to use same upsilon for both. This left
-    % the warm-glow as being very close to zero, so I have put the -1 in
-    % here so that there is actually a warm-glow worth keeping assets for.
+    % Seems odd given their choice to use same upsilon for both.
     F=warmglow;
     if aprime>0
         F=-Inf; % just to clean things up, so everyone will have a=0 when 'dead'
