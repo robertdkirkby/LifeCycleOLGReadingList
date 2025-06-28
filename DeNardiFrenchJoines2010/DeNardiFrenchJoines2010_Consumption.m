@@ -1,6 +1,6 @@
-function F=DeNardiFrenchJoines2010_ReturnFn(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, beta, agej, J, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)
+function c=DeNardiFrenchJoines2010_Consumption(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)
 
-F=-Inf;
+c=0;
 
 if h==0 || h==1 % Alive (good or bad health)
 
@@ -71,50 +71,7 @@ if h==0 || h==1 % Alive (good or bad health)
         govtransfers=cfloor-(a+aftertaxincome-m); % note: this is just the budget constraint rearranged, but with c=cfloor and aprime=0
     end
 
-    if c>0
-        % utility fn
-        F=(1+delta*h)*(c^(1-upsilon)-1)/(1-upsilon);
-    end
 end
 
-
-%% Warm-glow of bequests, on death
-if h==2
-    if a<=estateexemption
-        estate=a; % estate is untaxed
-    else
-        estate=(1-tau_e)*(a-estateexemption) + estateexemption; % Get taxed on the amount above the exemption 
-    end
-    warmglow=theta*((estate+k)^(1-upsilon))/(1-upsilon); % phi(e) in DNJ2010 notation
-    % 'k' here makes the warm-glow a 'luxury' so richer households leave bigger bequests.
-    % NOTE: According to eqns in DNJ2010 paper, phi(e) does not have a '-1' in numerator, while utility fn does.
-    % Seems odd given their choice to use same upsilon for both.
-    F=warmglow;
-    if aprime>0
-        F=-Inf; % just to clean things up, so everyone will have a=0 when 'dead'
-    end
-end
-% Note: if you end the final period still alive, this also counts as death,
-% so need the warm-glow in this situtation. But based on aprime, not a.
-if agej==J && (h==0 || h==1)
-    if aprime<=estateexemption
-        estate=aprime; % estate is untaxed
-    else
-        estate=(1-tau_e)*(aprime-estateexemption) + estateexemption; % Get taxed on the amount above the exemption 
-    end
-    warmglow=theta*((estate+k)^(1-upsilon))/(1-upsilon); % phi(e) in DNJ2010 notation
-    % 'k' here makes the warm-glow a 'luxury' so richer households leave bigger bequests.
-    % Note: in final period, add warm glow to utility, and include the discount factor
-    F=F+beta*warmglow; 
-end
-
-
-
-%% Dead=zero utility
-if h==3
-    F=0;
-end
-% Note: no need to enforce that the warm-glow of bequests actually lines up
-% with death, as it is only expectations that matter anyway.
 
 end

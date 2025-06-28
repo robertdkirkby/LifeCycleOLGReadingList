@@ -69,7 +69,7 @@ Params.beta=0.97;
 Params.upsilon=3.66; % CES utility param
 Params.delta=-0.36; % utility cost of bad health
 % Warm-glow of bequests (initial guesses, will be estimated)
-% Params.theta=2419; % intensity of bequest motive
+Params.theta=2419; % intensity of bequest motive
 Params.k=215; % determines curvature of warm-glow in bequests, and hence the extent to which bequests are a luxury good
 
 % Interest rate
@@ -673,8 +673,8 @@ DiscountFactorParamNames={'beta'};
 % Note: conditional survival probabilities are handled by pi_h_J
 % Specifically the transtions from h=0 & h=1 (good and bad health) to h=2 (death).
 
-ReturnFn=@(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
-    DeNardiFrenchJoines2010_ReturnFn(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
+ReturnFn=@(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, beta, agej, J, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
+    DeNardiFrenchJoines2010_ReturnFn(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, beta, agej, J, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
 
 
 %% Solve value fn and policy fn
@@ -814,8 +814,13 @@ FnsToEvaluate.medicalexpenses=@(aprime,a,h,zeta,xi,m_coeff_healthbad,m_coeff_hea
     DeNardiFrenchJoines2010_MedicalExpenses(aprime,a,h,zeta,xi,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood);
 FnsToEvaluate.govtransfers=@(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
     DeNardiFrenchJoines2010_GovTransfers(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
+FnsToEvaluate.consumption=@(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
+    DeNardiFrenchJoines2010_Consumption(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
+FnsToEvaluate.avgbequestsize=@(aprime,a,h,zeta,xi) a*(h==2); % note, this is in the period after it was left
+FnsToEvaluate.avgbequestsize2=@(aprime,a,h,zeta,xi,agej,J) (agej==J)*((h==0) || (h==1))*aprime; % just the final period
 
 simoptions.conditionalrestrictions.alive=@(aprime,a,h,zeta,xi) (h==0) || (h==1);
+simoptions.conditionalrestrictions.death=@(aprime,a,h,zeta,xi) (h==2);
 simoptions.conditionalrestrictions.ingoodhealth=@(aprime,a,h,zeta,xi) (h==0);
 simoptions.conditionalrestrictions.inbadhealth=@(aprime,a,h,zeta,xi) (h==1);
 
@@ -876,11 +881,11 @@ title('fraction of original 70 yr olds still alive')
 subplot(2,1,2); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.goodhealth.Mean)
 title('fraction in good health')
 
-% Look at earnings, after tax income, medical expenses, and gov transfers
+% Look at earnings, after tax income, medical expenses, gov transfers, and consumption
 % Note: DFJ2010 show the medical expenses data in their Figure 3 (data, not model, so should be similar but not same)
 figure_c=figure_c+1;
 figure(figure_c);
-subplot(2,2,1); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq1.Mean)
+subplot(3,2,1); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq1.Mean)
 hold on
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq2.Mean)
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq3.Mean)
@@ -894,7 +899,7 @@ plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.femaleq5.Me
 hold off
 title('Earnings (Mean)')
 legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
-subplot(2,2,2); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq1.Mean)
+subplot(3,2,2); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq1.Mean)
 hold on
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq2.Mean)
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq3.Mean)
@@ -907,7 +912,7 @@ plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femal
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femaleq5.Mean)
 title('After-Tax Income (Mean)')
 legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
-subplot(2,2,3); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq1.Mean)
+subplot(3,2,3); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq1.Mean)
 hold on
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq2.Mean)
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq3.Mean)
@@ -920,7 +925,7 @@ plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.fema
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.femaleq5.Mean)
 title('Medical expenses (Mean)')
 legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
-subplot(2,2,4); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq1.Mean)
+subplot(3,2,4); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq1.Mean)
 hold on
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq2.Mean)
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq3.Mean)
@@ -933,7 +938,32 @@ plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq5.Mean)
 title('Gov Transfers (Mean)')
 legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
-
+subplot(3,2,5); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.maleq1.Mean)
+hold on
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.maleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.maleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.maleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.maleq5.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.femaleq1.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.femaleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.femaleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.femaleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.femaleq5.Mean)
+title('Consumption (Mean)')
+legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+subplot(3,2,6); plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.maleq1.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.maleq1.Mean(end)])
+hold on % note, shift avgbequestsize one period, to when it was left, then include those left at end of final period
+plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.maleq2.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.maleq2.Mean(end)])
+plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.maleq3.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.maleq3.Mean(end)])
+plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.maleq4.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.maleq4.Mean(end)])
+plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.maleq5.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.maleq5.Mean(end)])
+plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.femaleq1.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.femaleq1.Mean(end)])
+plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.femaleq2.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.femaleq2.Mean(end)])
+plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.femaleq3.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.femaleq3.Mean(end)])
+plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.femaleq4.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.femaleq4.Mean(end)])
+plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.femaleq5.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.femaleq5.Mean(end)])
+title('Bequest (left at end of period; mean among those who die)')
+legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
 
 
 
