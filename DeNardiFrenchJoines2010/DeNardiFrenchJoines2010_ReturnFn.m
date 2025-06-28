@@ -16,7 +16,7 @@ if h==0 || h==1 % Alive (good or bad health)
 
     % Medical expenses (eqns 6,7,8 of DFJ2010)
     psi=zeta+xi; % markov + iid
-    m=exp(m_coeff+sigma_coeff*psi);
+    m=exp(m_coeff+sigma_coeff*psi); % m_coeff is about 5-6, sigma_coeff is about 1-2.5
 
     % income and taxes
     taxableincome=r*a+earnings;

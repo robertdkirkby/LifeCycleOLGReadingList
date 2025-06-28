@@ -19,6 +19,9 @@
 % Turn on both cfloor and medical expenses, asset profiles are hump shaped
 % So both (saving up for) medical expenses, and the huge warm-glow of bequests, are messing up the results.
 
+% To disable warm-glow, set theta=0
+% To divide medical expenses by 10, just modify the return fn (and medical expenses fn for calculating the model stats)
+
 % Do I have a typo in bequests and a typo in medical expenses?
 % Hard to figure out, as DFJ2020 do not really report any model output on either of these.
 
@@ -598,9 +601,13 @@ h_grid=[0;1;2;3]; % health status, 0=good, 1=bad, 2=death, 3=dead
 
 % AR(1) markov medical expense shock, zeta
 [zeta_grid,pi_zeta]=discretizeAR1_FarmerToda(0,Params.rho_m, Params.sigma_mepsilon, n_z(2));
+% Note: DFJ2010 used Tauchen-Hussey (Guassian quadrature) to discretize
+% [zeta_grid,pi_zeta]=discretizeAR1_TauchenHussey(0,Params.rho_m, Params.sigma_mepsilon, n_z(2)); % max is 1.26 instead of 1.73
 
 % i.i.d. medical expense shock, xi
 [xi_grid,pi_xi]=discretizeAR1_FarmerToda(0,0, Params.sigma_mxi, n_e);
+% Note: DFJ2010 used Tauchen-Hussey (Guassian quadrature) to discretize
+% [xi_grid,pi_xi]=discretizeAR1_TauchenHussey(0,0, Params.sigma_mxi, n_e); % max is 2.77 instead of 3.05
 pi_xi=pi_xi(1,:)';
 
 z_grid=[h_grid; zeta_grid];
@@ -870,6 +877,7 @@ subplot(2,1,2); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.good
 title('fraction in good health')
 
 % Look at earnings, after tax income, medical expenses, and gov transfers
+% Note: DFJ2010 show the medical expenses data in their Figure 3 (data, not model, so should be similar but not same)
 figure_c=figure_c+1;
 figure(figure_c);
 subplot(2,2,1); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq1.Mean)
