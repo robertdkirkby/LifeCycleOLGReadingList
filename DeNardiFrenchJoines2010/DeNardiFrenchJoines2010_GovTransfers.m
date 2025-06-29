@@ -1,4 +1,4 @@
-function govtransfers=DeNardiFrenchJoines2010_GovTransfers(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)
+function govtransfers=DeNardiFrenchJoines2010_GovTransfers(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)
 
 govtransfers=0;
 
@@ -20,7 +20,7 @@ if h==0 || h==1 % Alive (good or bad health)
 
         % Medical expenses (eqns 6,7,8 of DFJ2010)
         psi=zeta+xi; % markov + iid
-        m=exp(m_coeff+sigma_coeff*psi);
+        m=exp(m_coeff+sigma_coeff*(psi/normalizepsi));
 
         % income and taxes
         taxableincome=r*a+earnings;

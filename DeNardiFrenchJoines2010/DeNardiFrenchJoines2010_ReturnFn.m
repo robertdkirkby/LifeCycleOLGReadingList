@@ -1,4 +1,4 @@
-function F=DeNardiFrenchJoines2010_ReturnFn(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, beta, agej, J, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)
+function F=DeNardiFrenchJoines2010_ReturnFn(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, tau_e, estateexemption, beta, agej, J, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)
 
 F=-Inf;
 
@@ -13,10 +13,11 @@ if h==0 || h==1 % Alive (good or bad health)
         m_coeff=m_coeff_healthbad;
         sigma_coeff=sigma_coeff_healthbad;
     end
-
+    
     % Medical expenses (eqns 6,7,8 of DFJ2010)
     psi=zeta+xi; % markov + iid
-    m=exp(m_coeff+sigma_coeff*psi); % m_coeff is about 5-6, sigma_coeff is about 1-2.5
+    m=exp(m_coeff+sigma_coeff*(psi/normalizepsi)); % m_coeff is about 5-6, sigma_coeff is about 1-2.5
+    % normalization of psi is not described in DFJ2010 paper
 
     % income and taxes
     taxableincome=r*a+earnings;

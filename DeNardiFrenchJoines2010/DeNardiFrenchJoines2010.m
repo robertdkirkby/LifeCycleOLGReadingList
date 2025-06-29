@@ -13,17 +13,22 @@
 % index the income quintiles and q1,q2,...,q5 as names for them (DFJ2010 use I).
 
 % Asset profiles look wrong.
-% When I disable cfloor, bequests, and medical expenses, the assets go to zero at end of life, as expected.
-% Turn on only bequests, asset profiles now never go down.
-% Turn on only cfloor, asset profiles go to zero at end of life, as expected.
-% Turn on both cfloor and medical expenses, asset profiles are hump shaped
-% So both (saving up for) medical expenses, and the huge warm-glow of bequests, are messing up the results.
+% When I disable the warm-glow of bequests (theta=0), things are okay. 
+% [Female medical expenses shocks near end of life are still large enough 
+% to create hump-shape for assets, but this does not happen for males. Not 
+% clear if the female are incorrect, as DFJ2010 paper never plots results 
+% for just females.]
 
-% To disable warm-glow, set theta=0
-% To divide medical expenses by 10, just modify the return fn (and medical expenses fn for calculating the model stats)
+% I believe that the code here is fine and that the problem with bequests
+% is as follows: DFJ2010 solve the model by the FOCs/Euler eqns, hence
+% their code does not use the warm-glow of bequests function, only it's
+% derivative. Hence their parameters are all fine, but the warm-glow is
+% missing a constant term and so here where I use the warm-glow, rather
+% than it's derivative, this missing constant means the warm-glow is way to
+% big and this is what is making things look wrong.
 
-% Do I have a typo in bequests and a typo in medical expenses?
-% Hard to figure out, as DFJ2020 do not really report any model output on either of these.
+% There is normalization of psi=(zeta+xi) [in the medical expenses] that is
+% not mentioned in the paper. Done in codes with 'normalizepsi' parameter.
 
 %% I CANNOT FIND THREE PARAMETER VALUES. JUST USING PLACEHOLDERS FOR THE MOMENT
 % tau_e and estateexemption (tautilde and xtilde in DFJ2010 notation)
@@ -113,13 +118,13 @@ Params.rho_m=0.922; % autocorrelation, persistent part
 Params.sigma_mepsilon=sqrt(0.050); % std dev of innovations, persistent part
 Params.sigma_mxi=sqrt(0.665); % std dev of innovations, transitory part
 % Footnote 3: We assume that medical expenses are log-normally distributed, 
-% so the predicted level of medical expenses is exp (m <= 1/2*sigma^2), where 
+% so the predicted level of medical expenses is exp (m + 1/2*sigma^2), where 
 % m denotes predicted log medical expenses and sigma^2 denotes the variance of 
 % the idiosyncratic shock psi. The ratio of the level of medical expenses 
 % two standard deviations above the mean to average medical expenses is
 %    exp(m+2*sigma)/exp(m+1/2*sigma^2) =exp(2*sigma-1/2*sigma^2)
 % which =6.8 if sigma=sqrt(2.53)
-% Added Note: I'm sure why they use 2.23 as being a relevant number?
+% Added Note: I'm sure why they use 2.53 as being a relevant number?
 
 % Medical expenses 2/2.
 % Two deterministic coefficients, m(g,h,I,j) and sigma(g,h,I,j) from eqn (6) of DFJ2010
@@ -129,7 +134,26 @@ Params.sigma_mxi=sqrt(0.665); % std dev of innovations, transitory part
 % age-and-ptype dependent. Then in ReturnFn use health status in
 % if-statement to decide which of _healthgood and _healthbad to use).
 % sigma_coeff scales the standard deviation of the stochastic component
-% This is setup below
+% This is setup below.
+
+% Medical expenses in the model are exp(m+sigma*psi), psi=zeta+xi.
+% So we are not going to get the mean medical expenses being exp(m+1/2*sigma^2)
+% as footnote 3 of DFJ2010 says, unless stddev(psi)=1. But given the AR(1)
+% on zeta and the normal dist of xi,
+% stddev(psi)=sqrt(stddev(zeta)^2+stddev(xi)^2)
+% [as they are independent normals; AR(1) is asymptotically normal], and then 
+% stddev(psi)=sqrt((stddev(zeta innovations)/(1-rho_m))^2+stddev(xi)^2)
+% which is clearly not 1.
+% So, I introduce a scaling parameter
+Params.normalizepsi=sqrt( ((Params.sigma_mepsilon)/(1-Params.rho_m))^2 + Params.sigma_mxi^2);
+% And then when psi is used anywhere, I replace it with psi/normalizepsi
+% Thus stddev(psi/normalizpsi)=1, and we get the mean medical expenses
+% being exp(m+1/2*sigma^2).
+% [This was not mentioned anywhere in DFJ2010 paper, makes sense as soon as you see it
+% because they are two separate estimates off 'same' data, so you cannot just 
+% multiply their std devs, but took some figuring out.]
+
+
 
 
 %% Health transition probabilities
@@ -538,57 +562,57 @@ medexprof_adj.sigma_coeff.bPI2=-1.384958574*ones(1,33);
 % note: good health=0 and bad health =1 for healshift (following DFJ2010 regressions)
 cpercentile=10/100; % q1
 Params.m_coeff_healthgood.femaleq1=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.femaleq1=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthgood.maleq1=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.maleq1=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.femaleq1 =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthgood.maleq1  =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.maleq1   =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
 cpercentile=30/100; % q2
 Params.m_coeff_healthgood.femaleq2=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.femaleq2=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthgood.maleq2=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.maleq2=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.femaleq2 =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthgood.maleq2  =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.maleq2   =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
 cpercentile=50/100; % q3
 Params.m_coeff_healthgood.femaleq3=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.femaleq3=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthgood.maleq3=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.maleq3=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.femaleq3 =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthgood.maleq3  =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.maleq3   =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
 cpercentile=70/100; % q4
 Params.m_coeff_healthgood.femaleq4=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.femaleq4=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthgood.maleq4=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.maleq4=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.femaleq4 =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthgood.maleq4  =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.maleq4   =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
 cpercentile=90/100; % q5
 Params.m_coeff_healthgood.femaleq5=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.femaleq5=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthgood.maleq5=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
-Params.m_coeff_healthbad.maleq5=medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.femaleq5 =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*0+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthgood.maleq5  =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*0+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
+Params.m_coeff_healthbad.maleq5   =medexprof_adj.m_coeff.ageshiftFinal+medexprof_adj.m_coeff.healshift*1+medexprof_adj.m_coeff.maleshift*1+medexprof_adj.m_coeff.PIshift*cpercentile+medexprof_adj.m_coeff.bPI2*cpercentile^2;
 
 
 
 cpercentile=10/100; % q1
 Params.sigma_coeff_healthgood.femaleq1=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.femaleq1=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthgood.maleq1=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.maleq1=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.femaleq1 =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthgood.maleq1  =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.maleq1   =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
 cpercentile=30/100; % q2
 Params.sigma_coeff_healthgood.femaleq2=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.femaleq2=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthgood.maleq2=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.maleq2=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.femaleq2 =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthgood.maleq2  =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.maleq2   =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
 cpercentile=50/100; % q3
 Params.sigma_coeff_healthgood.femaleq3=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.femaleq3=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthgood.maleq3=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.maleq3=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.femaleq3 =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthgood.maleq3  =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.maleq3   =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
 cpercentile=70/100; % q4
 Params.sigma_coeff_healthgood.femaleq4=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.femaleq4=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthgood.maleq4=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.maleq4=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.femaleq4 =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthgood.maleq4  =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.maleq4   =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
 cpercentile=90/100; % q5
 Params.sigma_coeff_healthgood.femaleq5=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.femaleq5=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthgood.maleq5=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
-Params.sigma_coeff_healthbad.maleq5=medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.femaleq5 =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*0+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthgood.maleq5  =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*0+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
+Params.sigma_coeff_healthbad.maleq5   =medexprof_adj.sigma_coeff.ageshiftFinal+medexprof_adj.sigma_coeff.healshift*1+medexprof_adj.sigma_coeff.maleshift*1+medexprof_adj.sigma_coeff.PIshift*cpercentile+medexprof_adj.sigma_coeff.bPI2*cpercentile^2;
 
 
 %% Grids
@@ -673,8 +697,8 @@ DiscountFactorParamNames={'beta'};
 % Note: conditional survival probabilities are handled by pi_h_J
 % Specifically the transtions from h=0 & h=1 (good and bad health) to h=2 (death).
 
-ReturnFn=@(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, beta, agej, J, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
-    DeNardiFrenchJoines2010_ReturnFn(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, beta, agej, J, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
+ReturnFn=@(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, tau_e, estateexemption, beta, agej, J, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
+    DeNardiFrenchJoines2010_ReturnFn(aprime,a,h,zeta,xi,r,upsilon,delta,theta,k,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, tau_e, estateexemption, beta, agej, J, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
 
 
 %% Solve value fn and policy fn
@@ -810,12 +834,14 @@ FnsToEvaluate.goodhealth=@(aprime,a,h,zeta,xi) (h==0);
 FnsToEvaluate.earnings=@(aprime,a,h,zeta,xi,earnings) earnings;
 FnsToEvaluate.aftertaxincome=@(aprime,a,h,zeta,xi,r,earnings, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
     DeNardiFrenchJoines2010_AfterTaxIncome(aprime,a,h,zeta,xi,r,earnings, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
-FnsToEvaluate.medicalexpenses=@(aprime,a,h,zeta,xi,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood)...
-    DeNardiFrenchJoines2010_MedicalExpenses(aprime,a,h,zeta,xi,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood);
-FnsToEvaluate.govtransfers=@(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
-    DeNardiFrenchJoines2010_GovTransfers(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
-FnsToEvaluate.consumption=@(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
-    DeNardiFrenchJoines2010_Consumption(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, cfloor, tau_e, estateexemption, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
+FnsToEvaluate.medicalexpenses=@(aprime,a,h,zeta,xi,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood,normalizepsi)...
+    DeNardiFrenchJoines2010_MedicalExpenses(aprime,a,h,zeta,xi,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood,normalizepsi);
+FnsToEvaluate.govtransfers=@(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
+    DeNardiFrenchJoines2010_GovTransfers(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
+FnsToEvaluate.receivegovtransfers=@(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
+   (DeNardiFrenchJoines2010_GovTransfers(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)>0);
+FnsToEvaluate.consumption=@(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6)...
+    DeNardiFrenchJoines2010_Consumption(aprime,a,h,zeta,xi,r,earnings,m_coeff_healthbad,m_coeff_healthgood,sigma_coeff_healthbad,sigma_coeff_healthgood, normalizepsi, cfloor, taxbracket1, taxbracket2, taxbracket3, taxbracket4, taxbracket5, taxbracket6, margtaxrate0, margtaxrate1, margtaxrate2, margtaxrate3, margtaxrate4, margtaxrate5, margtaxrate6);
 FnsToEvaluate.avgbequestsize=@(aprime,a,h,zeta,xi) a*(h==2); % note, this is in the period after it was left
 FnsToEvaluate.avgbequestsize2=@(aprime,a,h,zeta,xi,agej,J) (agej==J)*((h==0) || (h==1))*aprime; % just the final period
 
@@ -828,6 +854,7 @@ tic;
 AgeConditionalStats=LifeCycleProfiles_FHorz_Case1_PType(StationaryDist,Policy,FnsToEvaluate,Params,n_d,n_a,n_z,N_j,Names_i,d_grid,a_grid,z_grid,simoptions);
 statstime2=toc
 
+%% 
 % Plot of assets by earnings quintile (DFJ2010 do a lot of versions of this)
 figure_c=figure_c+1;
 figure(figure_c);
@@ -883,6 +910,7 @@ title('fraction in good health')
 
 % Look at earnings, after tax income, medical expenses, gov transfers, and consumption
 % Note: DFJ2010 show the medical expenses data in their Figure 3 (data, not model, so should be similar but not same)
+% All use same legend, so only put it into the 4th
 figure_c=figure_c+1;
 figure(figure_c);
 subplot(3,2,1); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.maleq1.Mean)
@@ -898,7 +926,7 @@ plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.femaleq4.Me
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.earnings.femaleq5.Mean)
 hold off
 title('Earnings (Mean)')
-legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+% legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5','Location','northwest')
 subplot(3,2,2); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq1.Mean)
 hold on
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.maleq2.Mean)
@@ -911,7 +939,7 @@ plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femal
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femaleq4.Mean)
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.aftertaxincome.femaleq5.Mean)
 title('After-Tax Income (Mean)')
-legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+% legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5','Location','northwest')
 subplot(3,2,3); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq1.Mean)
 hold on
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.maleq2.Mean)
@@ -924,20 +952,20 @@ plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.fema
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.femaleq4.Mean)
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.medicalexpenses.femaleq5.Mean)
 title('Medical expenses (Mean)')
-legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
-subplot(3,2,4); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq1.Mean)
+% legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5','Location','northwest')
+subplot(3,2,4); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq1.Mean./AgeConditionalStats.alive.receivegovtransfers.maleq1.Mean)
 hold on
-plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq2.Mean)
-plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq3.Mean)
-plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq4.Mean)
-plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq5.Mean)
-plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq1.Mean)
-plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq2.Mean)
-plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq3.Mean)
-plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq4.Mean)
-plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq5.Mean)
-title('Gov Transfers (Mean)')
-legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq2.Mean./AgeConditionalStats.alive.receivegovtransfers.maleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq3.Mean./AgeConditionalStats.alive.receivegovtransfers.maleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq4.Mean./AgeConditionalStats.alive.receivegovtransfers.maleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.maleq5.Mean./AgeConditionalStats.alive.receivegovtransfers.maleq5.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq1.Mean./AgeConditionalStats.alive.receivegovtransfers.femaleq1.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq2.Mean./AgeConditionalStats.alive.receivegovtransfers.femaleq2.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq3.Mean./AgeConditionalStats.alive.receivegovtransfers.femaleq3.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq4.Mean./AgeConditionalStats.alive.receivegovtransfers.femaleq4.Mean)
+plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.govtransfers.femaleq5.Mean./AgeConditionalStats.alive.receivegovtransfers.femaleq5.Mean)
+title('Gov Transfers (Mean, conditional on receiving them)')
+legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5','Location','northwest')
 subplot(3,2,5); plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.maleq1.Mean)
 hold on
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.maleq2.Mean)
@@ -950,7 +978,7 @@ plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.femaleq3
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.femaleq4.Mean)
 plot(Params.agejshifter+(1:1:N_j),AgeConditionalStats.alive.consumption.femaleq5.Mean)
 title('Consumption (Mean)')
-legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+% legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5','Location','northwest')
 subplot(3,2,6); plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.maleq1.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.maleq1.Mean(end)])
 hold on % note, shift avgbequestsize one period, to when it was left, then include those left at end of final period
 plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.maleq2.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.maleq2.Mean(end)])
@@ -963,7 +991,7 @@ plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.fema
 plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.femaleq4.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.femaleq4.Mean(end)])
 plot(Params.agejshifter+(1:1:N_j),[AgeConditionalStats.death.avgbequestsize.femaleq5.Mean(2:end),AgeConditionalStats.alive.avgbequestsize2.femaleq5.Mean(end)])
 title('Bequest (left at end of period; mean among those who die)')
-legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5')
+% legend('femaleq1','femaleq2','femaleq3','femaleq4','femaleq5','maleq1','maleq2','maleq3','maleq4','maleq5','Location','northwest')
 
 
 
