@@ -377,24 +377,6 @@ title('Stationary Dist of agents, cdf over assets')
 % temp2=StationaryDist.HighSchool(end-20:end,:,:,:); sum(temp2(:))
 % temp3=StationaryDist.NoHighSchool(end-20:end,:,:,:); sum(temp3(:))
 
-
-%% Commented out is a double-check confirming that simulation and iteration codes give the same agent distribution
-% simoptions.iterate=0;
-% simoptions.parallel=1;
-% simoptions.nsims=10^4;
-% StationaryDist_Sim=StationaryDist_Case3_FHorz_PType(jequaloneDist,AgeWeightsParamNames,PTypeDistParamNames,Policy,n_d,n_a,n_z,n_u,N_j,Names_i,d_grid,a_grid,u_grid,pi_z,pi_u,aprimeFn, Params,simoptions);
-% 
-% fig1=figure(1);
-% plot(a_grid,StationaryDist.ptweights(1)*cumsum(sum(sum(sum(sum(StationaryDist.College,5),4),3),2)),'or');
-% hold on
-% plot(a_grid,StationaryDist_Sim.ptweights(1)*cumsum(sum(sum(sum(sum(StationaryDist.College,5),4),3),2)),'xr');
-% plot(a_grid,StationaryDist.ptweights(2)*cumsum(sum(sum(sum(sum(StationaryDist.HighSchool,5),4),3),2)),'ob');
-% plot(a_grid,StationaryDist_Sim.ptweights(2)*cumsum(sum(sum(sum(sum(StationaryDist.HighSchool,5),4),3),2)),'xb');
-% plot(a_grid,StationaryDist.ptweights(3)*cumsum(sum(sum(sum(sum(StationaryDist.NoHighSchool,5),4),3),2)),'og');
-% plot(a_grid,StationaryDist_Sim.ptweights(3)*cumsum(sum(sum(sum(sum(StationaryDist.NoHighSchool,5),4),3),2)),'xg');
-% hold off
-% title('Stationary Dist of agents, over assets')
-
 %% For computing aggregates and life cycle profiles
 FnsToEvaluate.Assets = @(d1,d2,a,v,e) a;
 FnsToEvaluate.ShareRisky = @(d1,d2,a,v,e) d1; % Note: this is correct at individual level, but is not the same as the aggregate share of risky assets
@@ -421,7 +403,7 @@ AgeConditionalStats=LifeCycleProfiles_FHorz_Case1_PType(StationaryDist,Policy, F
 % than reproduce these I just plot them as in terms of assets.
 
 % For consumption I need to do
-ValuesOnGrid=EvalFnOnAgentDist_ValuesOnGrid_FHorz_Case1_PType(StationaryDist, Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid, a_grid, z_grid_J, simoptions);
+ValuesOnGrid=EvalFnOnAgentDist_ValuesOnGrid_FHorz_Case1_PType(Policy, FnsToEvaluate, Params,n_d,n_a,n_z,N_j,Names_i,d_grid, a_grid, z_grid_J, simoptions);
 
 % Note, CGM2005 just plot the 'HighSchool' type
 % I plot for the median value of each schock
