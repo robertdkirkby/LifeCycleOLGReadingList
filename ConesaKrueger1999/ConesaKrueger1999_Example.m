@@ -418,17 +418,17 @@ toc
 % You can calculate the value and policy functions for the transition path
 tic;
 [VPath,PolicyPath]=ValueFnOnTransPath_Case1_FHorz(PricePath, ParamPath, T, V_final, Policy_final, Params, n_d, n_a, n_z, N_j, d_grid, a_grid,z_grid, pi_z, DiscountFactorParamNames, ReturnFn, transpathoptions, vfoptions);
-toc
+vpathtime=toc
 
 % You can then use these to calculate the agent distribution for the transition path
 tic;
 AgentDistPath=AgentDistOnTransPath_Case1_FHorz(StationaryDist_init, jequaloneDist, PricePath, ParamPath, PolicyPath, AgeWeightsParamNames,n_d,n_a,n_z,N_j,pi_z,T, Params, transpathoptions, simoptions);
-toc
+agentdisttime=toc
 
 % And then we can calculate AggVars for the path
 tic;
 AggVarsPath=EvalFnOnTransPath_AggVars_Case1_FHorz(FnsToEvaluate, AgentDistPath,PolicyPath, PricePath, ParamPath, Params, T, n_d, n_a, n_z, N_j, d_grid, a_grid,z_grid, transpathoptions, simoptions);
-toc
+aggvarstime=toc
 
 save ./SavedOutput/ConesaKrueger1999.mat -v7.3
 
