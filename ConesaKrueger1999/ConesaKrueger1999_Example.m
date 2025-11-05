@@ -6,7 +6,12 @@ transpathoptions.fastOLG=1;
 % demanding of hardware, so tends to only be possible for smaller grids.
 % But we can slash the memory use by combining it with divide-and-conquer
 vfoptions.divideandconquer=1;
-vfoptions.level1n=30;
+vfoptions.level1n=20;
+% And we can use grid interpolation layer, so we anyway don't need such a big grid for accurancy.
+vfoptions.gridinterplayer=1;
+vfoptions.ngridinterp=30;
+simoptions.gridinterplayer=vfoptions.gridinterplayer;
+simoptions.ngridinterp=vfoptions.ngridinterp;
 
 
 % There are three possible policy reforms, you can choose which one to solve
@@ -21,8 +26,8 @@ PolicyReform=1; % 1=Policy Reform A,  2=Policy Reform B,  3=Policy Reform C
 % can calculate analytic value for labor supply based on a and aprime, see
 % CK1999 paper. I model it explicitly so that code is easier to modify for
 % other uses.)
-n_d=101; % fraction of time worked
-n_a=1001; % assets
+n_d=51; % fraction of time worked
+n_a=501; % assets
 N_j=66; % age (number of periods, to be precise this is age-19)
 
 % Note that equation (2.1) of CK1999 includes the conditional probability of survival in the expectations operator.
@@ -156,7 +161,6 @@ Params.I_j=[ones(Params.Jr-1,1);zeros(Params.J-Params.Jr+1,1)];
 % Note that with my original version I_j was needed, but is redundant using the original epsilon_j numbers from CK1999
 
 vfoptions.policy_forceintegertype=2; % Policy was not being treated as integers (one of the elements was 10^(-15) different from an integer)
-heteroagentoptions.verbose=1;
 
 %%
 %Idiosycratic productivity shocks
@@ -223,7 +227,8 @@ Params.Tr=0.3; % lumpsum transfers made out of the accidental bequests
 
 %% Now, create the return function
 DiscountFactorParamNames={'beta','sj'};
-ReturnFn=@(l,aprime,a,eta,r,tau,epsilon_j,I_j,Tr,SS,theta,alpha,delta,gamma,sigma) ConesaKrueger1999_ReturnFn(l,aprime,a,eta,r,tau,epsilon_j,I_j,Tr,SS,theta,alpha,delta,gamma,sigma)
+ReturnFn=@(l,aprime,a,eta,r,tau,epsilon_j,I_j,Tr,SS,theta,alpha,delta,gamma,sigma) ...
+    ConesaKrueger1999_ReturnFn(l,aprime,a,eta,r,tau,epsilon_j,I_j,Tr,SS,theta,alpha,delta,gamma,sigma);
 
 %% Initial distribution of agents at birth (j=1)
 jequaloneDist=zeros([n_a,n_z]);
@@ -243,10 +248,16 @@ GeneralEqmEqns.SSrevenue = @(tau,FractionWorkingAge,b) tau-b*(1-FractionWorkingA
 GeneralEqmEqns.SSbalance = @(SS,K,N,FractionWorkingAge,b,theta,alpha) SS-b*(theta*(1-alpha)*((K/N)^alpha))*N/FractionWorkingAge; % Social Security adds up, based on eqn (2.12) b*w*N/(fraction working age) [this is eqn 2.12]
 GeneralEqmEqns.AccidentalBeq = @(Tr,Tr_left,n) Tr-Tr_left/(1+n); % Accidental bequests (adjusted for population growth) are equal to transfers received (this is essentially eqn (2.14))
 
+% Because we are going to calculate the general equilibrium transition
+% paths lets set it so that the general eqm (initial and final) are
+% calculated to very high (likely excessive) levels of accuracy.
+heteroagentoptions.toleranceGEprices=10^(-5); % Final eqm prices need to be highly accurate when using transition paths
+heteroagentoptions.toleranceGEcondns=10^(-5); % Final eqm condns need to be highly accurate when using transition paths
+
+heteroagentoptions.verbose=1;
 
 %% Solve for the initial General Equilibrium
-simoptions=struct(); % use defaults
-[p_eqm_init,~, GeneralEqmEqnsValues_init]=HeteroAgentStationaryEqm_Case1_FHorz(jequaloneDist,AgeWeightsParamNames,n_d, n_a, n_z, N_j, 0, pi_z, d_grid, a_grid, z_grid, ReturnFn, FnsToEvaluate, GeneralEqmEqns, Params, DiscountFactorParamNames, [], [], [], GEPriceParamNames, heteroagentoptions, simoptions, vfoptions);
+[p_eqm_init,GeneralEqmCondns_init]=HeteroAgentStationaryEqm_Case1_FHorz(jequaloneDist,AgeWeightsParamNames,n_d, n_a, n_z, N_j, 0, pi_z, d_grid, a_grid, z_grid, ReturnFn, FnsToEvaluate, GeneralEqmEqns, Params, DiscountFactorParamNames, [], [], [], GEPriceParamNames, heteroagentoptions, simoptions, vfoptions);
 
 Params.r=p_eqm_init.r;
 Params.tau=p_eqm_init.tau;
@@ -256,12 +267,12 @@ Params.Tr=p_eqm_init.Tr;
 % Some things about the initial general equilibrium  we will need for the transition path.
 [V_init, Policy_init]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_grid, pi_z, ReturnFn, Params, DiscountFactorParamNames, [],vfoptions);
 StationaryDist_init=StationaryDist_FHorz_Case1(jequaloneDist,AgeWeightsParamNames,Policy_init,n_d,n_a,n_z,N_j,pi_z,Params,simoptions);
-AggVars_init=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid);
+AggVars_init=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid,simoptions);
 
 
 % Calculate the relevant entries for Table 5.
-AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid);
-AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z, N_j, d_grid, a_grid, z_grid);
+AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid,simoptions);
+AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z, N_j, d_grid, a_grid, z_grid,simoptions);
 
 % Statistics just for working age
 simoptions.agegroupings=[1,Params.Jr]; % Working age, Retired (not actually interested in the numbers for retired)
@@ -288,7 +299,7 @@ Params.b=Params.b_final;
 Params.tau=Params.tau_final;
 Params.SS=Params.SS_final;
 
-[p_eqm_final,~, GeneralEqmEqnsValues_final]=HeteroAgentStationaryEqm_Case1_FHorz(jequaloneDist,AgeWeightsParamNames,n_d, n_a, n_z, N_j, 0, pi_z, d_grid, a_grid, z_grid, ReturnFn, FnsToEvaluate, GeneralEqmEqns, Params, DiscountFactorParamNames, [], [], [], GEPriceParamNames, heteroagentoptions, simoptions, vfoptions);
+[p_eqm_final,GeneralEqmCondns_final]=HeteroAgentStationaryEqm_Case1_FHorz(jequaloneDist,AgeWeightsParamNames,n_d, n_a, n_z, N_j, 0, pi_z, d_grid, a_grid, z_grid, ReturnFn, FnsToEvaluate, GeneralEqmEqns, Params, DiscountFactorParamNames, [], [], [], GEPriceParamNames, heteroagentoptions, simoptions, vfoptions);
 Params.r=p_eqm_final.r;
 Params.tau=p_eqm_final.tau;
 Params.SS=p_eqm_final.SS;
@@ -305,10 +316,10 @@ end
 % Some things about the final general equilibrium  we will need for the transition path.
 [V_final, Policy_final]=ValueFnIter_Case1_FHorz(n_d,n_a,n_z,N_j, d_grid, a_grid, z_grid, pi_z, ReturnFn, Params, DiscountFactorParamNames, [],vfoptions);
 StationaryDist_final=StationaryDist_FHorz_Case1(jequaloneDist,AgeWeightsParamNames,Policy_final,n_d,n_a,n_z,N_j,pi_z,Params,simoptions);
-AggVars_final=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_final, Policy_final, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid);
+AggVars_final=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_final, Policy_final, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid,simoptions);
 
-AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_final, Policy_final, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid);
-AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z, N_j, d_grid, a_grid, z_grid);
+AggVars=EvalFnOnAgentDist_AggVars_FHorz_Case1(StationaryDist_final, Policy_final, FnsToEvaluate, Params, [], n_d, n_a, n_z,N_j, d_grid, a_grid, z_grid,simoptions);
+AllStats=EvalFnOnAgentDist_AllStats_FHorz_Case1(StationaryDist_init, Policy_init, FnsToEvaluate, Params, [], n_d, n_a, n_z, N_j, d_grid, a_grid, z_grid,simoptions);
 
 % Statistics just for working age
 simoptions.agegroupings=[1,Params.Jr]; % Working age, Retired (not actually interested in the numbers for retired)
@@ -332,12 +343,6 @@ LifeCycleProfiles_final=LifeCycleProfiles_FHorz_Case1(StationaryDist_final,Polic
 % it will cause problems, too high just means run-time will be longer).
 % (Problems in the sense that solution would be 'incorrect', it would likely still solve)
 T=150; % CK1999 use T=150
-
-% Because we are going to calculate the general equilibrium transition
-% paths lets set it so that the general eqm (initial and final) are
-% calculated to very high (likely excessive) levels of accuracy.
-heteroagentoptions.toleranceGEprices=10^(-5); % Final eqm prices need to be highly accurate when using transition paths
-heteroagentoptions.toleranceGEcondns=10^(-5); % Final eqm condns need to be highly accurate when using transition paths
 
 % Three reforms are considered. These represent three different paths for the social security benefits (replacement rate) b.
 % ParamPathNames={'b'}; % This is the parameter that gets changed 'away' from it's initial value.
@@ -385,10 +390,6 @@ GeneralEqmEqns_Transition.AccidentalBeq = @(Tr,Tr_left_tminus1,n) Tr-Tr_left_tmi
 % To use a '_tminus1' variable we must include its initial value
 transpathoptions.initialvalues.Tr_left=p_eqm_init.Tr;
 
-% Setup the options relating to the transition path
-transpathoptions.verbose=1;
-transpathoptions.maxiterations=200; % default is 1000
-
 transpathoptions.GEnewprice=3;
 % Need to explain to transpathoptions how to use the GeneralEqmEqns to update the general eqm transition prices (in PricePath).
 transpathoptions.GEnewprice3.howtoupdate=... % a row is: GEcondn, price, add, factor
@@ -402,8 +403,12 @@ transpathoptions.GEnewprice3.howtoupdate=... % a row is: GEcondn, price, add, fa
 % A small 'factor' will make the convergence to solution take longer, but too large a value will make it 
 % unstable (fail to converge). Technically this is the damping factor in a shooting algorithm.
 
-fprintf('Now solving for the transition path for Policy %i \n', PolicyReform)
+% Setup the options relating to the transition path
 transpathoptions.verbose=1;
+transpathoptions.maxiter=200; % default is 1000
+
+fprintf('Now solving for the transition path for Policy %i \n', PolicyReform)
+% vfoptions.lowmemory=1; % to reduce memory use for the transition paths (only use if you get out of GPU memory errors)
 tic;
 PricePath=TransitionPath_Case1_FHorz(PricePath0, ParamPath, T, V_final, StationaryDist_init, jequaloneDist, n_d, n_a, n_z, N_j, d_grid,a_grid,z_grid, pi_z, ReturnFn, FnsToEvaluate, GeneralEqmEqns_Transition, Params, DiscountFactorParamNames, AgeWeightsParamNames, transpathoptions, simoptions, vfoptions);
 toc 
